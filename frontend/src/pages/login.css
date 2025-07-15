@@ -46,7 +46,6 @@ p {
 
 form input {
   width: 290px;
-  max-width: 100%;
   padding: 10px 20px;
   margin: 0.5rem 0;
   border: 1px solid #ccc;
@@ -72,7 +71,8 @@ form input {
 }
 
 .login-button {
-  width: 100%;
+  width: 330px;
+  max-width: 100%;
   background: #6366f1;
   color: white;
   padding: 0.75rem;
@@ -83,6 +83,18 @@ form input {
   cursor: pointer;
   margin-top: 0.5rem;
   transition: background 0.3s ease;
+}
+#signup{
+  width: 165px;
+  border-radius: 0px;
+  padding: 0.5rem;
+}
+#login{
+  width: 165px;
+  background-color: #ccc;
+  border-radius: 0px;
+  padding: 0.5rem;
+
 }
 
 .login-button:hover {
