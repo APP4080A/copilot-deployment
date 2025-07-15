@@ -1,8 +1,10 @@
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  username TEXT UNIQUE,
-  email TEXT,
-  password_hash TEXT
+  username TEXT UNIQUE NOT NULL,       -- Username should be NOT NULL for traditional login
+  email TEXT UNIQUE,                  -- Email should be UNIQUE for Google login, and can be NULL for username-only users
+  password_hash TEXT,                 -- password_hash can be NULL for Google-registered users
+  googleId TEXT UNIQUE,               -- New column for Google User ID
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS tasks (

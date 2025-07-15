@@ -1,0 +1,230 @@
+/* Import Google Font - Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Global Box Sizing */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.login-container {
+  min-height: 100vh; /* Use min-height for better content adaptability */
+  width: 100vw;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #f0f4f8, #e0e7ee); /* Softer gradient background */
+  padding: 1.5rem; /* Increased padding for better spacing on small screens */
+  box-sizing: border-box;
+}
+
+.login-box {
+  width: 100%;
+  max-width: 440px; /* Slightly increased max-width for more breathing room */
+  background: white;
+  padding: 2.5rem 2rem; /* Adjusted padding */
+  border-radius: 16px; /* More rounded corners */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.05); /* Softer, deeper shadow */
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem; /* Consistent vertical spacing between elements */
+}
+
+.login-icon {
+  width: 60px; /* Slightly larger icon */
+  height: 60px;
+  margin-bottom: 0.5rem; /* Reduced margin, relying on gap for spacing */
+}
+
+h2 {
+  font-size: 1.8rem; /* Larger heading */
+  font-weight: 700; /* Bolder */
+  color: #2d3748; /* Darker, more professional color */
+  margin: 0; /* Reset margin, controlled by parent gap */
+}
+
+p {
+  color: #718096; /* Softer text color */
+  font-size: 0.95rem; /* Slightly larger text */
+  line-height: 1.5;
+  margin-bottom: 1.5rem;
+}
+
+form {
+  width: 100%; /* Form takes full width of its container */
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem; /* Spacing between form elements */
+}
+
+form input {
+  width: 100%; /* Inputs take full width of the form */
+  padding: 0.75rem 1rem; /* Increased padding */
+  border: 1px solid #e2e8f0; /* Softer border color */
+  background-color: #f7fafc; /* Lighter background for inputs */
+  border-radius: 8px; /* Rounded input fields */
+  font-size: 1rem; /* Standard font size */
+  color: #2d3748;
+  outline: none; /* Remove default outline */
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+form input:focus {
+  border-color: #6366f1; /* Highlight border on focus */
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); /* Subtle focus ring */
+}
+
+.password-wrapper {
+  position: relative;
+  width: 100%; /* Ensure wrapper takes full width */
+}
+
+.toggle-password {
+  position: absolute;
+  right: 1rem; /* Adjusted right spacing */
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #718096; /* Softer eye icon color */
+  font-size: 1.1rem; /* Slightly larger icon */
+}
+
+.login-button {
+  width: 100%; /* Button takes full width */
+  background: linear-gradient(to right, #6366f1, #8b5cf6); /* Gradient background */
+  color: white;
+  padding: 0.9rem; /* Increased padding for a larger button */
+  border: none;
+  border-radius: 8px; /* Rounded button */
+  font-weight: 600; /* Slightly bolder */
+  font-size: 1.05rem; /* Slightly larger font */
+  cursor: pointer;
+  margin-top: 0.5rem;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3); /* Button shadow */
+  transition: all 0.3s ease;
+}
+
+.login-button:hover {
+  background: linear-gradient(to right, #4f46e5, #7c3aed); /* Darker gradient on hover */
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4); /* Enhanced shadow on hover */
+  transform: translateY(-2px); /* Slight lift effect */
+}
+
+.login-button:active {
+  transform: translateY(0); /* Press effect */
+  box-shadow: 0 2px 5px rgba(99, 102, 241, 0.2);
+}
+
+/* Removed specific #signup and #login button styles as navigation is handled by Link */
+
+.login-footer {
+  display: flex;
+  flex-direction: column; /* Stack elements vertically */
+  align-items: center; /* Center align items */
+  font-size: 0.9rem; /* Slightly larger font */
+  margin-top: 1rem; /* Increased margin */
+  gap: 0.5rem; /* Spacing between footer elements */
+}
+
+.login-footer a {
+  color: #6366f1;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.login-footer a:hover {
+  color: #4f46e5;
+  text-decoration: underline;
+}
+
+.login-footer p {
+  margin: 0; /* Reset paragraph margin */
+  color: #718096;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  width: 100%; /* Divider takes full width */
+  margin: 1.5rem 0;
+}
+
+.divider hr {
+  flex: 1;
+  border: none;
+  height: 1px;
+  background: #cbd5e0; /* Softer divider line */
+}
+
+.divider span {
+  margin: 0 1rem;
+  color: #a0aec0; /* Lighter text color */
+  font-size: 0.8rem; /* Slightly smaller font */
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.google-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem; /* Increased gap between icon and text */
+  width: 100%;
+  padding: 0.75rem 1rem; /* Adjusted padding */
+  border: 1px solid #e2e8f0; /* Softer border */
+  background: white;
+  border-radius: 8px; /* Rounded button */
+  font-weight: 600; /* Bolder text */
+  color: #4a5568; /* Darker text color */
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); /* Subtle shadow */
+  transition: all 0.2s ease;
+}
+
+.google-login:hover {
+  background-color: #f7fafc; /* Slight background change on hover */
+  border-color: #cbd5e0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Enhanced shadow on hover */
+}
+
+.google-icon {
+  width: 24px; /* Standard icon size */
+  height: 24px;
+  margin-bottom: 0; /* Remove margin-bottom, flex handles alignment */
+}
+
+/* Media Queries for smaller screens */
+@media (max-width: 480px) {
+  .login-box {
+    padding: 1.5rem 1rem; /* More compact padding on very small screens */
+  }
+
+  h2 {
+    font-size: 1.6rem;
+  }
+
+  p {
+    font-size: 0.85rem;
+  }
+
+  form input,
+  .login-button,
+  .google-login {
+    padding: 0.6rem 0.8rem; /* Smaller padding for inputs/buttons */
+    font-size: 0.9rem;
+  }
+
+  .toggle-password {
+    right: 0.8rem;
+  }
+}
