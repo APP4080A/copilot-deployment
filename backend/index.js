@@ -7,15 +7,21 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const sqlite3 = require('sqlite3').verbose();
 const { OAuth2Client } = require('google-auth-library');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const nodemailer = require('nodemailer'); // Import nodemailer
 
 const app = express();
 const PORT = 5000;
-const JWT_SECRET = 'our_very_strong_random_secret_key_here'; // **CHANGE THIS IN PRODUCTION**
+// IMPORTANT: In production, this should be a strong, random string loaded from environment variables.
+const JWT_SECRET = process.env.JWT_SECRET || 'Test_APP4080A';
 
 // --- Google OAuth Configuration ---
-const GOOGLE_CLIENT_ID = '346346971642-sqn2mfp07hsmumth3re7rjpo5auh92pv.apps.googleusercontent.com';
-const GOOGLE_CLIENT_SECRET = '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';
-const GOOGLE_REDIRECT_URI = 'http://localhost:5000/api/google-auth-callback';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '346346971642-sqn2mfp07hsmumth3re7rjpo5auh92pv.apps.googleusercontent.com';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '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';
+// Ensure this redirect URI matches what you configured in Google Cloud Console
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/api/google-auth-callback';
 
 const oAuth2Client = new OAuth2Client(
     GOOGLE_CLIENT_ID,
@@ -25,46 +31,108 @@ const oAuth2Client = new OAuth2Client(
 // --- End Google OAuth Configuration ---
 
 
-// --- SQLite Database Setup ---
-const db = new sqlite3.Database('./db/copilot.db', (err) => {
+// --- Nodemailer Transporter Setup for Ethereal Email (for testing) ---
+let transporter; // Declare transporter globally
+
+// Create a test account with Ethereal.email
+nodemailer.createTestAccount((err, account) => {
     if (err) {
-        console.error('Error opening database:', err.message);
+        console.error('[Nodemailer ERROR] Failed to create a testing account with Ethereal:', err.message);
+        console.warn('Email sending will not work. Please check your network connection or try again.');
+        // Fallback or exit if Ethereal account cannot be created
+        return;
+    }
+
+    transporter = nodemailer.createTransport({
+        host: account.smtp.host,
+        port: account.smtp.port,
+        secure: account.smtp.secure,
+        auth: {
+            user: account.user,
+            pass: account.pass,
+        },
+        tls: {
+            rejectUnauthorized: false // Allow self-signed certs for Ethereal
+        }
+    });
+
+    console.log('[Nodemailer] Ethereal test account created.');
+    console.log('[Nodemailer] Ethereal SMTP URL:', nodemailer.getTestMessageUrl(account)); // Log the Ethereal inbox URL
+
+    // Verify transporter configuration
+    transporter.verify(function (error, success) {
+        if (error) {
+            console.error('[Nodemailer ERROR] Transporter verification failed:', error);
+            console.warn('Email sending might not work. Please check Ethereal setup.');
+        } else {
+            console.log('[Nodemailer] Server is ready to take our messages via Ethereal.');
+        }
+    });
+});
+// --- End Nodemailer Transporter Setup ---
+
+
+// --- SQLite Database Setup ---
+const dbPath = path.join(__dirname, 'db', 'copilot.db');
+const dbDir = path.dirname(dbPath);
+const initSqlPath = path.join(__dirname, 'db', 'init.sql'); // Corrected path to init.sql
+
+// Ensure the database directory exists
+if (!fs.existsSync(dbDir)) {
+    console.log(`[DB Setup] Database directory '${dbDir}' does not exist. Creating it...`);
+    try {
+        fs.mkdirSync(dbDir, { recursive: true });
+        console.log(`[DB Setup] Database directory '${dbDir}' created successfully.`);
+    } catch (mkdirErr) {
+        console.error(`[DB Setup ERROR] Error creating database directory '${dbDir}':`, mkdirErr.message);
+        process.exit(1); // Exit if directory cannot be created
+    }
+} else {
+    console.log(`[DB Setup] Database directory '${dbDir}' already exists.`);
+}
+
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+        console.error('[DB Connect ERROR] Error opening database:', err.message);
+        console.error('[DB Connect ERROR] Database path attempted:', dbPath);
+        process.exit(1); // Exit if DB connection fails
     } else {
-        console.log('Connected to the SQLite database: ./db/copilot.db');
+        console.log('[DB Connect] Connected to the SQLite database:', dbPath);
 
-        // Updated 'users' table to include googleId for OAuth users
-        db.run(`CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      email TEXT UNIQUE,
-      password_hash TEXT,
-      googleId TEXT UNIQUE,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`, (createUsersErr) => {
-            if (createUsersErr) {
-                console.error('Error creating users table:', createUsersErr.message);
-            } else {
-                console.log('Users table checked/created.');
-            }
-        });
-
-        // Create 'tasks' table based on init.sql schema
-        db.run(`CREATE TABLE IF NOT EXISTS tasks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT,
-      description TEXT,
-      status TEXT,
-      priority TEXT,
-      due_date TEXT,
-      assigned_to INTEGER,
-      FOREIGN KEY (assigned_to) REFERENCES users(id)
-    )`, (createTasksErr) => {
-            if (createTasksErr) {
-                console.error('Error creating tasks table:', createTasksErr.message);
-            } else {
-                console.log('Tasks table checked/created.');
-            }
-        });
+        // Read and execute init.sql to create tables
+        try {
+            const initSql = fs.readFileSync(initSqlPath, 'utf8');
+            db.exec(initSql, function (execErr) {
+                if (execErr) {
+                    console.error('[DB Init ERROR] Error executing init.sql:', execErr.message);
+                    console.error('[DB Init ERROR] SQL executed:', initSql);
+                } else {
+                    console.log('[DB Init] init.sql executed successfully. Tables checked/created.');
+                    // NEW: Verify users table schema after init.sql execution
+                    db.all("PRAGMA table_info(users)", (pragmaErr, columns) => {
+                        if (pragmaErr) {
+                            console.error('[DB Schema ERROR] Error getting users table info:', pragmaErr.message);
+                        } else {
+                            console.log('[DB Schema] Users table columns:', columns.map(col => col.name).join(', '));
+                            if (!columns.some(col => col.name === 'passwordResetToken') || !columns.some(col => col.name === 'passwordResetExpires')) {
+                                console.warn('[DB Schema WARNING] passwordResetToken or passwordResetExpires columns are missing from users table!');
+                            }
+                        }
+                    });
+                    // NEW: Verify tasks table schema
+                    db.all("PRAGMA table_info(tasks)", (pragmaErr, columns) => {
+                        if (pragmaErr) {
+                            console.error('[DB Schema ERROR] Error getting tasks table info:', pragmaErr.message);
+                        } else {
+                            console.log('[DB Schema] Tasks table columns:', columns.map(col => col.name).join(', '));
+                        }
+                    });
+                }
+            });
+        } catch (readErr) {
+            console.error('[DB Init ERROR] Error reading init.sql file:', readErr.message);
+            process.exit(1); // Exit if init.sql cannot be read
+        }
     }
 });
 // --- End SQLite Database Setup ---
@@ -92,7 +160,7 @@ app.post('/api/register', async (req, res) => {
         // Check if a user with the given username or email already exists
         db.get('SELECT * FROM users WHERE username = ? OR email = ?', [username, email], async (err, row) => {
             if (err) {
-                console.error('Database error during registration check:', err.message);
+                console.error('[API Register ERROR] Database error during registration check:', err.message);
                 return res.status(500).json({ message: 'Server error.' });
             }
             if (row) {
@@ -111,17 +179,17 @@ app.post('/api/register', async (req, res) => {
                 [username, email, password_hash],
                 function (insertErr) {
                     if (insertErr) {
-                        console.error('Database error during user insertion:', insertErr.message);
+                        console.error('[API Register ERROR] Database error during user insertion:', insertErr.message);
                         return res.status(500).json({ message: 'Server error during registration.' });
                     }
-                    console.log(`User ${username} registered with ID: ${this.lastID}`);
+                    console.log(`[API Register] User ${username} registered with ID: ${this.lastID}`);
                     res.status(201).json({ message: 'User registered successfully!', userId: this.lastID });
                 }
             );
         });
 
     } catch (error) {
-        console.error('Registration process error:', error);
+        console.error('[API Register ERROR] Registration process error:', error);
         res.status(500).json({ message: 'Server error during registration process.' });
     }
 });
@@ -142,7 +210,7 @@ app.post('/api/login', async (req, res) => {
     try {
         db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
             if (err) {
-                console.error('Database error during login check:', err.message);
+                console.error('[API Login ERROR] Database error during login check:', err.message);
                 return res.status(500).json({ message: 'Server error.' });
             }
             if (!user) {
@@ -170,7 +238,7 @@ app.post('/api/login', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Login process error:', error);
+        console.error('[API Login ERROR] Login process error:', error);
         res.status(500).json({ message: 'Server error during login process.' });
     }
 });
@@ -188,9 +256,7 @@ app.get('/api/google-login', (req, res) => {
         scope: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
         prompt: 'consent' // Forces consent screen every time, useful for testing
     });
-    // In a real app, you'd typically have the frontend redirect directly
-    // to this authorizeUrl, not have the backend do a redirect.
-    // This endpoint is more for demonstrating how to generate the URL.
+
     res.json({ authUrl: authorizeUrl });
 });
 
@@ -204,7 +270,7 @@ app.get('/api/google-auth-callback', async (req, res) => {
     const { code } = req.query; // Get the authorization code from Google's redirect
 
     if (!code) {
-        console.error('No authorization code received from Google.');
+        console.error('[API Google Callback ERROR] No authorization code received from Google.');
         return res.status(400).send('Authorization code missing.');
     }
 
@@ -226,7 +292,7 @@ app.get('/api/google-auth-callback', async (req, res) => {
         // Check if user already exists in your database by googleId or email
         db.get('SELECT * FROM users WHERE googleId = ? OR email = ?', [googleId, email], async (err, user) => {
             if (err) {
-                console.error('Database error during Google login/registration check:', err.message);
+                console.error('[API Google Callback ERROR] Database error during Google login/registration check:', err.message);
                 // Redirect to frontend with an error message
                 return res.redirect(`http://localhost:3000/?error=server_error`);
             }
@@ -234,7 +300,7 @@ app.get('/api/google-auth-callback', async (req, res) => {
             let appToken;
             if (user) {
                 // User exists: Log them in
-                console.log(`User ${user.username} logged in via Google.`);
+                console.log(`[API Google Callback] User ${user.username} logged in via Google.`);
                 appToken = jwt.sign(
                     { id: user.id, username: user.username },
                     JWT_SECRET,
@@ -244,16 +310,16 @@ app.get('/api/google-auth-callback', async (req, res) => {
                 res.redirect(`http://localhost:3000/?token=${appToken}`);
             } else {
                 // New user: Register them
-                console.log(`New Google user: ${username} (${email})`);
+                console.log(`[API Google Callback] New Google user: ${username} (${email})`);
                 db.run(`INSERT INTO users (username, email, googleId, password_hash) VALUES (?, ?, ?, ?)`,
                     [username, email, googleId, null], // password_hash is null for Google users
                     function (insertErr) {
                         if (insertErr) {
-                            console.error('Database error during new Google user insertion:', insertErr.message);
+                            console.error('[API Google Callback ERROR] Database error during new Google user insertion:', insertErr.message);
                             return res.redirect(`http://localhost:3000/?error=registration_failed`);
                         }
-                        console.log(`Google user ${username} registered with ID: ${this.lastID}`);
-                        // FIX: For new Google users, redirect to the login page with a success message, not a token.
+                        console.log(`[API Google Callback] Google user ${username} registered with ID: ${this.lastID}`);
+                        // For new Google users, redirect to the login page with a success message, not a token.
                         return res.redirect(`http://localhost:3000/?message=google_registration_success`);
                     }
                 );
@@ -263,12 +329,87 @@ app.get('/api/google-auth-callback', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Google OAuth process error:', error);
+        console.error('[API Google Callback ERROR] Google OAuth process error:', error);
         // Redirect to frontend with an error message
         res.redirect(`http://localhost:3000/?error=google_auth_failed`);
     }
 });
 
+/**
+ * Handles the request for a password reset link.
+ * Expects: { email } in the request body.
+ * Generates a token, stores it, and sends an email with the reset link.
+ */
+app.post('/api/forgot-password', (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ message: 'Email is required.' });
+    }
+
+    db.get('SELECT * FROM users WHERE email = ?', [email], (err, user) => {
+        if (err) {
+            console.error('[API Forgot Password ERROR] Database error during forgot password lookup:', err.message);
+            return res.status(500).json({ message: 'Server error.' });
+        }
+
+        // Always send a generic success message to prevent email enumeration attacks
+        if (!user) {
+            console.log(`[API Forgot Password] Attempted password reset for non-existent email: ${email}`);
+            return res.status(200).json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+        }
+
+        // Generate a unique token
+        const token = crypto.randomBytes(20).toString('hex');
+        // Set token expiry (e.g., 1 hour from now)
+        const expires = new Date(Date.now() + 3600000).toISOString(); // 1 hour in milliseconds
+
+        db.run(`UPDATE users SET passwordResetToken = ?, passwordResetExpires = ? WHERE id = ?`,
+            [token, expires, user.id],
+            function (updateErr) {
+                if (updateErr) {
+                    console.error('[API Forgot Password ERROR] Database error updating password reset token:', updateErr.message);
+                    return res.status(500).json({ message: 'Server error updating reset token.' });
+                }
+
+                const resetLink = `http://localhost:3000/reset-password?token=${token}`; // Frontend reset page URL
+                console.log(`[API Forgot Password] Generated reset link for ${email}: ${resetLink}`);
+
+                // Ensure transporter is initialized before sending mail
+                if (!transporter) {
+                    console.error('[Nodemailer ERROR] Ethereal transporter not initialized. Cannot send email.');
+                    return res.status(500).json({ message: 'Email service not ready. Please try again later.' });
+                }
+
+                // Send the email
+                const mailOptions = {
+                    from: '"Co-pilot App" <no-reply@copilot.com>', // Sender address (can be anything for Ethereal)
+                    to: user.email, // Recipient address
+                    subject: 'Password Reset Request',
+                    html: `
+                <p>You are receiving this because you (or someone else) have requested the reset of the password for your account.</p>
+                <p>Please click on the following link, or paste this into your browser to complete the process:</p>
+                <p><a href="${resetLink}">${resetLink}</a></p>
+                <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>
+                <p>This link will expire in 1 hour.</p>
+            `,
+                };
+
+                transporter.sendMail(mailOptions, (mailErr, info) => {
+                    if (mailErr) {
+                        console.error('[Nodemailer ERROR] Error sending password reset email to', user.email, ':', mailErr.message);
+                        // Even if email fails, still return success to prevent enumeration
+                        return res.status(200).json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+                    }
+                    console.log('[Nodemailer] Password reset email sent to %s: %s', user.email, info.messageId);
+                    // Log the Ethereal preview URL so you can easily check the email
+                    console.log('[Nodemailer] Preview URL: %s', nodemailer.getTestMessageUrl(info));
+                    res.status(200).json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+                });
+            }
+        );
+    });
+});
 
 /**
  * Example of a protected API route.
@@ -285,7 +426,7 @@ app.get('/api/protected', (req, res) => {
         req.user = jwt.verify(token, JWT_SECRET);
         res.status(200).json({ message: `Welcome, ${req.user.username}! This is protected data.` });
     } catch (error) {
-        console.error('Token verification failed:', error.message);
+        console.error('[API Protected ERROR] Token verification failed:', error.message);
         res.status(403).json({ message: 'Token is not valid, authorization denied.' });
     }
 });

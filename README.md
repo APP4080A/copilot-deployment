@@ -25,7 +25,7 @@ All features are categorized into:
 | Feature                         | Description                                    | Status |
 |----------------------------------|------------------------------------------------|--------|
 | User Registration               | Register with username + password              | 🔲     |
-| User Login / Logout             | Secure login and logout with token/session     | 🔲     |
+| User LoginPage / Logout             | Secure login and logout with token/session     | 🔲     |
 | JWT-based Token Authentication  | Token-based auth system                        | 🔲     |
 
 #### Project Management
@@ -49,9 +49,9 @@ All features are categorized into:
 
 | Screen               | Purpose                                                         | Status |
 |----------------------|------------------------------------------------------------------|--------|
-| Landing Page         | Intro to CoPilot, with Sign Up / Login options                  | 🔲     |
-| Sign Up / Login Page | Simple and secure user authentication forms                     | 🔲     |
-| Dashboard            | Overview of assigned tasks and project activity                 | 🔲     |
+| Landing Page         | Intro to CoPilot, with Sign Up / LoginPage options                  | 🔲     |
+| Sign Up / LoginPage Page | Simple and secure user authentication forms                     | 🔲     |
+| DashboardPage            | Overview of assigned tasks and project activity                 | 🔲     |
 | Task Board           | Display tasks grouped by status (To Do / In Progress / Done)    | 🔲     |
 | Project Details View | Show specific project info and task list                        | 🔲     |
 

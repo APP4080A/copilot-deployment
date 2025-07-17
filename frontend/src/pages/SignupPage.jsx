@@ -1,31 +1,27 @@
+// src/pages/SignupPage.jsx
 import React, { useState, useEffect } from "react";
-import "./login.css";
+import "./styles/LoginPage.css";
 import logo from '../assets/logo.png';
 import google from '../assets/google.jpg';
 import { Link, useNavigate } from 'react-router-dom';
 
-
-export default function Signup() {
-  // State to toggle password visibility for both password fields
+export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
-  // States for all input fields
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  // State to display error messages
   const [error, setError] = useState('');
-  // State to display success messages
   const [message, setMessage] = useState('');
-  const navigate = useNavigate(); // Hook for programmatic navigation
+  const navigate = useNavigate();
 
   // Effect to handle redirects from Google OAuth callback
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const authError = params.get('error');
-    const successMessage = params.get('message'); // Get the 'message' parameter
+    const successMessage = params.get('message');
 
     if (token) {
       // This path is for successful Google LOGIN (existing user)
@@ -33,12 +29,12 @@ export default function Signup() {
       setMessage('Signup/Login successful via Google!');
       console.log('Google Signup/Login successful, token stored.');
       window.history.replaceState({}, document.title, window.location.pathname);
-      navigate('/dashboard'); // Redirect to dashboard
+      navigate('/tasks'); // Redirect to TaskboardPage after Google login
     } else if (successMessage === 'google_registration_success') {
-      // Handle Google REGISTRATION success
+      // Handle Google REGISTRATION success: Display message and redirect to log in
       setMessage('Google account registered successfully! Please log in.');
       window.history.replaceState({}, document.title, window.location.pathname);
-      navigate('/'); // Redirect to the login page
+      navigate('/'); // Redirect to the login page after Google registration
     } else if (authError) {
       // This path is for any Google OAuth errors
       setError(`Google signup/login failed: ${authError.replace(/_/g, ' ')}`);
@@ -84,7 +80,6 @@ export default function Signup() {
         headers: {
           'Content-Type': 'application/json',
         },
-        // Send username, email, and password.
         // Note: 'fullName' is collected but not sent to the backend's current DB schema.
         body: JSON.stringify({ username, email, password }),
       });
@@ -95,8 +90,12 @@ export default function Signup() {
       if (response.ok) {
         setMessage(data.message); // Display success message from backend
         console.log('Signup successful:', data.message);
-        // Optionally redirect to login page after successful signup
-        // navigate('/'); // Example: Redirect to login page
+        console.log('Attempting to navigate to login page...'); // Added console log for debugging
+
+        setTimeout(() => {
+          navigate('/');
+          console.log('Navigation to login page initiated.');
+        }, 100); // Small delay
       } else {
         // Display error message from backend (e.g., "Username already exists")
         setError(data.message || 'Signup failed. Please try again.');
@@ -142,7 +141,7 @@ export default function Signup() {
                 onChange={(e) => setFullName(e.target.value)}
             />
             <input
-                type="email" // Use type="email" for better browser validation and mobile keyboard
+                type="email"
                 placeholder="Email"
                 required
                 value={email}

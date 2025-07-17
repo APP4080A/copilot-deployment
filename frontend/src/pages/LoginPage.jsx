@@ -1,10 +1,11 @@
+// src/pages/LoginPage.jsx
 import React, { useState, useEffect } from "react";
-import "./login.css";
+import "./styles/LoginPage.css";
 import logo from '../assets/logo.png';
 import google from '../assets/google.jpg';
 import { Link, useNavigate } from 'react-router-dom';
 
-export default function Login() {
+export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -17,7 +18,7 @@ export default function Login() {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const authError = params.get('error');
-    const successMessage = params.get('message'); // Get the 'message' parameter
+    const successMessage = params.get('message');
 
     if (token) {
       // This path is for successful Google LOGIN (existing user)
@@ -25,12 +26,12 @@ export default function Login() {
       setMessage('Login successful via Google!');
       console.log('Google Login successful, token stored.');
       window.history.replaceState({}, document.title, window.location.pathname);
-      navigate('/dashboard'); // Redirect to dashboard
+      navigate('/tasks'); // Redirect to TaskboardPage after Google login
     } else if (successMessage === 'google_registration_success') {
       // Handle Google REGISTRATION success: Display message on login page
       setMessage('Google account registered successfully! Please log in.');
       window.history.replaceState({}, document.title, window.location.pathname);
-      // No navigation needed here, as the user is already on the login page
+
     } else if (authError) {
       // This path is for any Google OAuth errors
       setError(`Google login failed: ${authError.replace(/_/g, ' ')}`);
@@ -64,7 +65,7 @@ export default function Login() {
         setMessage(data.message);
         localStorage.setItem('userToken', data.token);
         console.log('Login successful, token stored:', data.token);
-        navigate('/dashboard');
+        navigate('/tasks'); // Redirect to TaskboardPage after successful login
       } else {
         setError(data.message || 'Login failed. Please try again.');
         console.error('Login failed:', data.message);
@@ -125,7 +126,7 @@ export default function Login() {
 
             <button type="submit" className="login-button">Login</button>
             <div className="login-footer">
-              <a href="#">Forgot Password?</a>
+              <Link to="/forgot-password" style={{ color: '#007bff', textDecoration: 'none' }}>Forgot Password?</Link>
               <p>Don't have an account? <Link to="/signup" style={{ color: '#007bff', textDecoration: 'none' }}>Sign Up</Link></p>
             </div>
           </form>
