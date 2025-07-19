@@ -431,6 +431,386 @@ app.get('/api/protected', (req, res) => {
     }
 });
 
+// Fetches all columns and their tasks, including their order.
+app.get('/api/board', (req, res) => {
+    const boardData = {
+        columnOrder: [],
+        columns: {}
+    };
+
+    // First, fetch columns in their correct order
+    db.all("SELECT id, title, position FROM columns ORDER BY position ASC", [], (err, columns) => {
+        if (err) {
+            console.error('[API GET /api/board ERROR] Error fetching columns:', err.message);
+            return res.status(500).json({ message: 'Error fetching board columns.' });
+        }
+
+        if (columns.length === 0) {
+            return res.status(200).json(boardData); // Return empty board if no columns
+        }
+
+        boardData.columnOrder = columns.map(col => col.id);
+
+        // Prepare a promise for each column's tasks
+        const taskPromises = columns.map(col => {
+            return new Promise((resolve, reject) => {
+                db.all(
+                    "SELECT id, title, description, column_id, due_date, tags, assignee, position FROM tasks WHERE column_id = ? ORDER BY position ASC",
+                    [col.id],
+                    (taskErr, tasks) => {
+                        if (taskErr) {
+                            console.error(`[API GET /api/board ERROR] Error fetching tasks for column ${col.id}:`, taskErr.message);
+                            return reject(taskErr);
+                        }
+                        // Parse tags from JSON string back to array
+                        const parsedTasks = tasks.map(task => ({
+                            ...task,
+                            tags: task.tags ? JSON.parse(task.tags) : []
+                        }));
+                        boardData.columns[col.id] = parsedTasks;
+                        resolve();
+                    }
+                );
+            });
+        });
+
+        // Wait for all task fetches to complete
+        Promise.all(taskPromises)
+            .then(() => {
+                res.status(200).json(boardData);
+            })
+            .catch(error => {
+                res.status(500).json({ message: 'Error fetching board tasks.', error: error.message });
+            });
+    });
+});
+
+
+
+// Expects: { columnId, title, due, tags, assignee }
+app.post('/api/tasks', (req, res) => {
+    const { columnId, title, due, tags, assignee } = req.body; // Tags should be an array from frontend
+    const taskId = uuidv4(); // Generate UUID on backend for tasks for consistency
+
+    if (!columnId || !title) {
+        return res.status(400).json({ message: 'Column ID and task title are required.' });
+    }
+
+    // Get the highest position in the column to add the new task at the end
+    db.get("SELECT MAX(position) as max_position FROM tasks WHERE column_id = ?", [columnId], (err, row) => {
+        if (err) {
+            console.error('[API POST /api/tasks ERROR] Error getting max position:', err.message);
+            return res.status(500).json({ message: 'Error adding task.' });
+        }
+
+        const newPosition = (row.max_position || -1) + 1; // Start from 0 if no tasks exist
+
+        // Convert tags array to JSON string for storage
+        const tagsJson = JSON.stringify(tags || []);
+
+        db.run(
+            `INSERT INTO tasks (id, title, column_id, due_date, tags, assignee, position) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [taskId, title.trim(), columnId, due || null, tagsJson, assignee || 'Unassigned', newPosition],
+            function (insertErr) {
+                if (insertErr) {
+                    console.error('[API POST /api/tasks ERROR] Error inserting new task:', insertErr.message);
+                    return res.status(500).json({ message: 'Error adding task.' });
+                }
+                const newTask = {
+                    id: taskId,
+                    title: title.trim(),
+                    column_id: columnId,
+                    due_date: due || 'TBD',
+                    tags: tags || [],
+                    assignee: assignee || 'Unassigned',
+                    position: newPosition
+                };
+                res.status(201).json({ message: 'Task added successfully!', task: newTask });
+            }
+        );
+    });
+});
+
+
+// Expects: { title, due, tags, assignee } in body
+app.put('/api/tasks/:id', (req, res) => {
+    const { id } = req.params;
+    const { title, due, tags, assignee } = req.body;
+
+    if (!title) {
+        return res.status(400).json({ message: 'Task title is required.' });
+    }
+
+    // Convert tags array to JSON string for storage
+    const tagsJson = JSON.stringify(tags || []);
+
+    db.run(
+        `UPDATE tasks SET title = ?, due_date = ?, tags = ?, assignee = ? WHERE id = ?`,
+        [title.trim(), due || null, tagsJson, assignee || 'Unassigned', id],
+        function (updateErr) {
+            if (updateErr) {
+                console.error(`[API PUT /api/tasks/${id} ERROR] Error updating task:`, updateErr.message);
+                return res.status(500).json({ message: 'Error updating task.' });
+            }
+            if (this.changes === 0) {
+                return res.status(404).json({ message: 'Task not found.' });
+            }
+            res.status(200).json({ message: 'Task updated successfully!' });
+        }
+    );
+});
+
+
+// Expects: { sourceColumnId, destColumnId, newIndex } in body
+app.put('/api/tasks/:id/move', (req, res) => {
+    const { id: taskId } = req.params;
+    const { sourceColumnId, destColumnId, newIndex } = req.body;
+
+    if (!sourceColumnId || !destColumnId || newIndex === undefined) {
+        return res.status(400).json({ message: 'Source column, destination column, and new index are required.' });
+    }
+
+    db.serialize(() => { // Use serialize for sequential DB operations
+        db.run('BEGIN TRANSACTION;');
+
+        // Step 1: Remove task from its original position and shift others in source column
+        db.run(
+            `UPDATE tasks SET position = position - 1 WHERE column_id = ? AND position > (SELECT position FROM tasks WHERE id = ?)`,
+            [sourceColumnId, taskId],
+            (err) => {
+                if (err) {
+                    console.error('[API PUT /api/tasks/move ERROR] Error shifting tasks in source column:', err.message);
+                    db.run('ROLLBACK;');
+                    return res.status(500).json({ message: 'Error moving task.' });
+                }
+
+                // Step 2: Make space for the task in the destination column
+                db.run(
+                    `UPDATE tasks SET position = position + 1 WHERE column_id = ? AND position >= ?`,
+                    [destColumnId, newIndex],
+                    (err) => {
+                        if (err) {
+                            console.error('[API PUT /api/tasks/move ERROR] Error shifting tasks in destination column:', err.message);
+                            db.run('ROLLBACK;');
+                            return res.status(500).json({ message: 'Error moving task.' });
+                        }
+
+                        // Step 3: Update the moved task's column and position
+                        db.run(
+                            `UPDATE tasks SET column_id = ?, position = ? WHERE id = ?`,
+                            [destColumnId, newIndex, taskId],
+                            function (err) {
+                                if (err) {
+                                    console.error('[API PUT /api/tasks/move ERROR] Error updating moved task:', err.message);
+                                    db.run('ROLLBACK;');
+                                    return res.status(500).json({ message: 'Error moving task.' });
+                                }
+                                if (this.changes === 0) {
+                                    db.run('ROLLBACK;');
+                                    return res.status(404).json({ message: 'Task not found for move operation.' });
+                                }
+                                db.run('COMMIT;', (commitErr) => {
+                                    if (commitErr) {
+                                        console.error('[API PUT /api/tasks/move ERROR] Error committing transaction:', commitErr.message);
+                                        return res.status(500).json({ message: 'Error committing task move.' });
+                                    }
+                                    res.status(200).json({ message: 'Task moved successfully!' });
+                                });
+                            }
+                        );
+                    }
+                );
+            }
+        );
+    });
+});
+
+
+app.delete('/api/tasks/:id', (req, res) => {
+    const { id } = req.params;
+    let columnIdOfDeletedTask = null; // To store column_id for position update
+
+    // First, get the task to know its column and position
+    db.get("SELECT column_id, position FROM tasks WHERE id = ?", [id], (err, task) => {
+        if (err) {
+            console.error(`[API DELETE /api/tasks/${id} ERROR] Error fetching task for deletion check:`, err.message);
+            return res.status(500).json({ message: 'Error deleting task.' });
+        }
+        if (!task) {
+            return res.status(404).json({ message: 'Task not found.' });
+        }
+
+        columnIdOfDeletedTask = task.column_id;
+        const deletedPosition = task.position;
+
+        db.serialize(() => {
+            db.run('BEGIN TRANSACTION;');
+
+            // Delete the task
+            db.run(`DELETE FROM tasks WHERE id = ?`, [id], function (deleteErr) {
+                if (deleteErr) {
+                    console.error(`[API DELETE /api/tasks/${id} ERROR] Error deleting task:`, deleteErr.message);
+                    db.run('ROLLBACK;');
+                    return res.status(500).json({ message: 'Error deleting task.' });
+                }
+                if (this.changes === 0) {
+                    db.run('ROLLBACK;');
+                    return res.status(404).json({ message: 'Task not found during deletion.' });
+                }
+
+                // Shift positions of remaining tasks in the same column
+                db.run(
+                    `UPDATE tasks SET position = position - 1 WHERE column_id = ? AND position > ?`,
+                    [columnIdOfDeletedTask, deletedPosition],
+                    (shiftErr) => {
+                        if (shiftErr) {
+                            console.error(`[API DELETE /api/tasks/${id} ERROR] Error shifting positions after deletion:`, shiftErr.message);
+                            db.run('ROLLBACK;');
+                            return res.status(500).json({ message: 'Error shifting task positions.' });
+                        }
+
+                        db.run('COMMIT;', (commitErr) => {
+                            if (commitErr) {
+                                console.error('[API DELETE /api/tasks/id ERROR] Error committing transaction after task deletion:', commitErr.message);
+                                return res.status(500).json({ message: 'Error committing task deletion.' });
+                            }
+                            res.status(200).json({ message: 'Task deleted successfully!' });
+                        });
+                    }
+                );
+            });
+        });
+    });
+});
+
+
+// Expects: { title } in body
+app.post('/api/columns', (req, res) => {
+    const { title } = req.body;
+    const columnId = title.trim().toLowerCase().replace(/\s+/g, '-'); // Generate ID from title
+
+    if (!title) {
+        return res.status(400).json({ message: 'Column title is required.' });
+    }
+
+    // Check for duplicate column ID (or title, if IDs are generated from titles)
+    db.get("SELECT id FROM columns WHERE id = ?", [columnId], (err, row) => {
+        if (err) {
+            console.error('[API POST /api/columns ERROR] Error checking duplicate column:', err.message);
+            return res.status(500).json({ message: 'Error adding column.' });
+        }
+        if (row) {
+            return res.status(409).json({ message: 'A column with this title already exists.' });
+        }
+
+        // Get the highest position to add the new column at the end
+        db.get("SELECT MAX(position) as max_position FROM columns", [], (err, row) => {
+            if (err) {
+                console.error('[API POST /api/columns ERROR] Error getting max column position:', err.message);
+                return res.status(500).json({ message: 'Error adding column.' });
+            }
+
+            const newPosition = (row.max_position || -1) + 1;
+
+            db.run(
+                `INSERT INTO columns (id, title, position) VALUES (?, ?, ?)`,
+                [columnId, title.trim(), newPosition],
+                function (insertErr) {
+                    if (insertErr) {
+                        console.error('[API POST /api/columns ERROR] Error inserting new column:', insertErr.message);
+                        return res.status(500).json({ message: 'Error adding column.' });
+                    }
+                    const newColumn = { id: columnId, title: title.trim(), position: newPosition, tasks: [] };
+                    res.status(201).json({ message: 'Column added successfully!', column: newColumn });
+                }
+            );
+        });
+    });
+});
+
+
+// Expects: { columnOrder: ["col1", "col2", ...] } in body
+app.put('/api/columns/order', (req, res) => {
+    const { columnOrder } = req.body;
+
+    if (!Array.isArray(columnOrder)) {
+        return res.status(400).json({ message: 'columnOrder must be an array.' });
+    }
+
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION;');
+
+        const updatePromises = columnOrder.map((columnId, index) => {
+            return new Promise((resolve, reject) => {
+                db.run(`UPDATE columns SET position = ? WHERE id = ?`, [index, columnId], function (err) {
+                    if (err) {
+                        return reject(err);
+                    }
+                    resolve();
+                });
+            });
+        });
+
+        Promise.all(updatePromises)
+            .then(() => {
+                db.run('COMMIT;', (commitErr) => {
+                    if (commitErr) {
+                        console.error('[API PUT /api/columns/order ERROR] Error committing transaction:', commitErr.message);
+                        return res.status(500).json({ message: 'Error updating column order.' });
+                    }
+                    res.status(200).json({ message: 'Column order updated successfully!' });
+                });
+            })
+            .catch(error => {
+                console.error('[API PUT /api/columns/order ERROR] Error updating column positions:', error.message);
+                db.run('ROLLBACK;');
+                res.status(500).json({ message: 'Error updating column order.', error: error.message });
+            });
+    });
+});
+
+
+app.delete('/api/columns/:id', (req, res) => {
+    const { id: columnId } = req.params;
+
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION;');
+
+        // Delete the column (this will also delete associated tasks due to ON DELETE CASCADE)
+        db.run(`DELETE FROM columns WHERE id = ?`, [columnId], function (err) {
+            if (err) {
+                console.error(`[API DELETE /api/columns/${columnId} ERROR] Error deleting column:`, err.message);
+                db.run('ROLLBACK;');
+                return res.status(500).json({ message: 'Error deleting column.' });
+            }
+            if (this.changes === 0) {
+                db.run('ROLLBACK;');
+                return res.status(404).json({ message: 'Column not found.' });
+            }
+
+            // Update positions of remaining columns
+            db.run(
+                `UPDATE columns SET position = position - 1 WHERE position > (SELECT position FROM (SELECT position FROM columns WHERE id = ?) temp_col)`,
+                [columnId], // Subquery to get the position of the deleted column
+                (shiftErr) => {
+                    if (shiftErr) {
+                        console.error(`[API DELETE /api/columns/${columnId} ERROR] Error shifting column positions:`, shiftErr.message);
+                        db.run('ROLLBACK;');
+                        return res.status(500).json({ message: 'Error shifting column positions.' });
+                    }
+                    db.run('COMMIT;', (commitErr) => {
+                        if (commitErr) {
+                            console.error('[API DELETE /api/columns/id ERROR] Error committing transaction after column deletion:', commitErr.message);
+                            return res.status(500).json({ message: 'Error committing column deletion.' });
+                        }
+                        res.status(200).json({ message: 'Column deleted successfully!' });
+                    });
+                }
+            );
+        });
+    });
+});
+
 // --- Server Start ---
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
