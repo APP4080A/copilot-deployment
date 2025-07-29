@@ -1,3 +1,5 @@
+// src/pages/ForgetPasswordPage.jsx
+
 import React, { useState } from "react";
 import './styles/LoginPage.css';
 import logo from '../assets/logo.png';
@@ -69,7 +71,7 @@ export default function ForgotPasswordPage() {
                         {isLoading ? 'Sending...' : 'Send Reset Link'}
                     </button>
                     <div className="login-footer">
-                        <p><Link to="/" style={{ color: '#007bff', textDecoration: 'none' }}>Back to Login</Link></p>
+                        <p><Link to="/login" style={{ color: '#007bff', textDecoration: 'none' }}>Back to Login</Link></p>
                     </div>
                 </form>
             </div>

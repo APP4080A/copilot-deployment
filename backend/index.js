@@ -294,7 +294,8 @@ app.get('/api/google-auth-callback', async (req, res) => {
             if (err) {
                 console.error('[API Google Callback ERROR] Database error during Google login/registration check:', err.message);
                 // Redirect to frontend with an error message
-                return res.redirect(`http://localhost:3000/?error=server_error`);
+                // CHANGE THIS LINE:
+                return res.redirect(`http://localhost:3000/login?error=server_error`);
             }
 
             let appToken;
@@ -307,7 +308,8 @@ app.get('/api/google-auth-callback', async (req, res) => {
                     { expiresIn: '1h' }
                 );
                 // If user existed and logged in, redirect to frontend with token
-                res.redirect(`http://localhost:3000/?token=${appToken}`);
+                // CHANGE THIS LINE:
+                res.redirect(`http://localhost:3000/login?token=${appToken}`);
             } else {
                 // New user: Register them
                 console.log(`[API Google Callback] New Google user: ${username} (${email})`);
@@ -316,11 +318,13 @@ app.get('/api/google-auth-callback', async (req, res) => {
                     function (insertErr) {
                         if (insertErr) {
                             console.error('[API Google Callback ERROR] Database error during new Google user insertion:', insertErr.message);
-                            return res.redirect(`http://localhost:3000/?error=registration_failed`);
+                            // CHANGE THIS LINE:
+                            return res.redirect(`http://localhost:3000/login?error=registration_failed`);
                         }
                         console.log(`[API Google Callback] Google user ${username} registered with ID: ${this.lastID}`);
                         // For new Google users, redirect to the login page with a success message, not a token.
-                        return res.redirect(`http://localhost:3000/?message=google_registration_success`);
+                        // CHANGE THIS LINE:
+                        return res.redirect(`http://localhost:3000/login?message=google_registration_success`);
                     }
                 );
                 // Important: Return here to prevent further execution before db.run callback finishes
@@ -331,10 +335,10 @@ app.get('/api/google-auth-callback', async (req, res) => {
     } catch (error) {
         console.error('[API Google Callback ERROR] Google OAuth process error:', error);
         // Redirect to frontend with an error message
-        res.redirect(`http://localhost:3000/?error=google_auth_failed`);
+        // CHANGE THIS LINE:
+        res.redirect(`http://localhost:3000/login?error=google_auth_failed`);
     }
 });
-
 /**
  * Handles the request for a password reset link.
  * Expects: { email } in the request body.
