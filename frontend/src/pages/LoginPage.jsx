@@ -94,7 +94,7 @@ export default function LoginPage() {
       <div className="container-fluid bg-light min-vh-100 d-flex justify-content-center align-items-center px-3"
           style={{ overflow: "hidden", paddingTop: "40px", paddingBottom: "40px"}}>
           <div className="bg-white p-4 rounded-4 shadow-lg w-100"
-           style={{ maxWidth: "420px", minHeight:"auto" }}>
+           style={{ maxWidth: "420px", minHeight:"auto" , padding: "20px"}}>
             <div className="text-center mb-4">
               <img src={logo} alt="Co-pilot Logo" className="mb-3" style={{ width: "50px" }} />
               <h4 className="fw-bold">Log In</h4>

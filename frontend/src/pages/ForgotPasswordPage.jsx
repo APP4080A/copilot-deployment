@@ -46,31 +46,30 @@ export default function ForgotPasswordPage() {
     };
 
     return (
-        <div className="login-container">
-            <div className="login-box">
-                <img src={logo} alt="Co-pilot Logo" className="login-icon" />
-                <h2>Forgot Password?</h2>
-                <p>Enter your email address below and we'll send you a link to reset your password.</p>
+        <div className="container-fluid bg-light min-vh-100 d-flex justify-content-center align-items-center px-3"
+            style={{ overflow: "hidden", paddingTop: "40px", paddingBottom: "40px"}}>
+            <div className="bg-white p-4 rounded-4 shadow-lg w-100"
+             style={{ maxWidth: "420px", minHeight:"auto" }}>
+              <div className="text-center mb-4">
+                <img src={logo} alt="Co-pilot Logo" className="mb-3" style={{ width: "50px" }} />
+                <h2 className="fw-bold">Forgot your password?</h2>
+                <p className="text-muted mb-0">Enter your email address below and we'll send you a link to reset your password.</p>
                 <form onSubmit={handleSubmit}>
-                    <input
-                        type="email"
-                        placeholder="Email Address"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={isLoading} // Disable input while loading
-                    />
+                    <div className="mb-3">
+                        <input type="email" className="form-control" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} required />
+                    </div>
 
-                    {error && <p className="error-message" style={{ color: 'red', marginTop: '10px' }}>{error}</p>}
-                    {message && <p className="success-message" style={{ color: 'green', marginTop: '10px' }}>{message}</p>}
+                    {error && <p className="text-danger text-center">{error}</p>}
+                    {message && <p className="text-success text-center">{message}</p>}
 
-                    <button type="submit" className="login-button" disabled={isLoading}>
+                    <button type="submit" className="btn btn-primary w-100 mb-3" disabled={isLoading}>
                         {isLoading ? 'Sending...' : 'Send Reset Link'}
                     </button>
-                    <div className="login-footer">
-                        <p><Link to="/" style={{ color: '#007bff', textDecoration: 'none' }}>Back to Login</Link></p>
+                    <div className="text-center">
+                        <p><Link to="/login" className="text-primary text-decoration-none">Back to Login</Link></p>
                     </div>
                 </form>
+                </div>
             </div>
         </div>
     );
