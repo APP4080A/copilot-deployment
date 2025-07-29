@@ -52,8 +52,8 @@ export default function ForgotPasswordPage() {
              style={{ maxWidth: "420px", minHeight:"auto" }}>
               <div className="text-center mb-4">
                 <img src={logo} alt="Co-pilot Logo" className="mb-3" style={{ width: "50px" }} />
-                <h2 className="fw-bold">Forgot your password?</h2>
-                <p className="text-muted mb-0">Enter your email address below and we'll send you a link to reset your password.</p>
+                <h2 className="fw-bold">Forgot Password?</h2>
+                <p className="text- dark">Enter your email address below and we'll send you a link to reset your password.</p>
                 <form onSubmit={handleSubmit}>
                     <div className="mb-3">
                         <input type="email" className="form-control" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} required />
