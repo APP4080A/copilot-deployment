@@ -10,6 +10,8 @@ import DashboardPage from './pages/DashboardPage.jsx';
 import TeamViewPage from './pages/TeamViewPage.jsx';
 import TaskboardPage from './pages/TaskboardPage.jsx';
 import UserProfilePage from './pages/UserProfilePage.jsx';
+import '@fortawesome/fontawesome-free/css/all.min.css';
+
 
 import AppLayout from './components/AppLayout.jsx';
 

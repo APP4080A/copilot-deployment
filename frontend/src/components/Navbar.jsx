@@ -6,34 +6,33 @@ function Navbar() {
     const location = useLocation();
 
     return (
-        <nav className="navbar">
-            <div className="navbar-brand">
-                <div className="navbar-logo"></div>
-                <span className="navbar-name">Co-Pilot</span>
+        <nav className="navbar navbar-expand-lg navbar-light bg-light sticky-top">
+        <div className="container-fluid justify-content-between">
+            <span className="navbar-brand fw-bold">Co-Pilot</span>
+
+            <div className="mx-auto">
+                <ul className="navbar-nav me-auto mb-2 mb-lg-0 d-flex flex-row gap-4">
+                    <li className="nav-item"><a className="nav-link" href="team">Team</a></li>
+                    <li className="nav-item"><a className="nav-link active" href="tasks">Task Board</a></li>
+                    <li className="nav-item"><a className="nav-link" href="profile">Profile</a></li>
+                </ul>
             </div>
-            <ul className="navbar-nav-links">
-                <li>
-                    <Link to="/dashboard" className={`nav-link ${location.pathname === '/dashboard' ? 'active' : ''}`}>
-                        Dashboard
-                    </Link>
-                </li>
-                <li>
-                    <Link to="/team" className={`nav-link ${location.pathname === '/team' ? 'active' : ''}`}>
-                        Team
-                    </Link>
-                </li>
-                <li>
-                    <Link to="/tasks" className={`nav-link ${location.pathname === '/tasks' ? 'active' : ''}`}>
-                        Task Board
-                    </Link>
-                </li>
-                <li>
-                    <Link to="/profile" className={`nav-link ${location.pathname === '/profile' ? 'active' : ''}`}>
-                        Profile
-                    </Link>
-                </li>
-            </ul>
+
+            <form className="d-flex">
+                <input
+                className="form-control me-2"
+                type="search"
+                placeholder="Search tasks..."
+                aria-label="Search"
+                 />
+            </form>
+
+            <Link to="/" className="ms-3" title="Logout">
+                <i className="fas fa-power-off text-dark"></i>
+            </Link>
+        </div>
         </nav>
+
     );
 }
 

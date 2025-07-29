@@ -112,127 +112,50 @@ function Column({ id, title, tasks, onAddTask, onDeleteColumn, onEditTaskClick }
     };
 
     return (
-  <div className="mb-4" style={{ width: '350px', minWidth: '260px', flex: '0 0 auto' }}>
-    <div className="border rounded p-3 bg-white shadow-sm h-100 d-flex flex-column">
-      {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h5 className="mb-0">
-          {title} <span className="text-muted">({tasks.length})</span>
-        </h5>
-        {onDeleteColumn && (
-          <button
-            onClick={() => onDeleteColumn(id)}
-            className="btn btn-sm btn-outline-danger"
-            aria-label={`Delete column ${title}`}
-          >
-            &times;
-          </button>
-        )}
-      </div>
-
-      {/* Task List */}
-      <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-        <div className="flex-grow-1 mb-3">
-          {tasks.map(task => (
-            <TaskCard key={task.id} id={task.id} task={task} onEditClick={onEditTaskClick} />
-          ))}
-        </div>
-      </SortableContext>
-
-      {/* Add Task */}
-      {showInput ? (
-        <div className="mt-auto">
-          <input
-            type="text"
-            value={newTaskTitle}
-            onChange={e => setNewTaskTitle(e.target.value)}
-            placeholder="Task title"
-            className="form-control mb-2"
-          />
-          <input
-            type="date"
-            value={newTaskDue}
-            onChange={e => setNewTaskDue(e.target.value)}
-            className="form-control mb-2"
-            title="Due Date"
-          />
-          <input
-            type="text"
-            value={newTaskTags}
-            onChange={e => setNewTaskTags(e.target.value)}
-            placeholder="Tags (comma-separated)"
-            className="form-control mb-2"
-          />
-          <input
-            type="text"
-            value={newTaskAssignee}
-            onChange={e => setNewTaskAssignee(e.target.value)}
-            placeholder="Assignee"
-            className="form-control mb-3"
-          />
-          <div className="d-flex justify-content-between">
-            <button onClick={handleAddNewTask} className="btn btn-success btn-sm w-50 me-1">
-              Add Task
-            </button>
-            <button onClick={() => setShowInput(false)} className="btn btn-secondary btn-sm w-50 ms-1">
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button className="btn btn-outline-primary btn-sm mt-auto" onClick={() => setShowInput(true)}>
-          + Add New Task
+  <div className="col-lg-3 col-md-6 mb-4" style={{ height: "400px", width: '350px', minWidth: '260px', flex: '0 0 auto' }}>
+  <div className="border rounded p-3 bg-light shadow-sm h-100 d-flex flex-column">
+    {/* Header */}
+    <div className="d-flex justify-content-between align-items-center mb-3">
+      <h5 className="mb-0">
+        {title} <span className="text-muted">({tasks.length})</span>
+      </h5>
+      {onDeleteColumn && (
+        <button
+          onClick={() => onDeleteColumn(id)}
+          className="btn btn-sm text-muted border-0"
+          style={{ fontSize: "1.2rem" }}
+          aria-label={`Delete column ${title}`}
+        >
+          &times;
         </button>
       )}
     </div>
+
+    {/* Scrollable Task List */}
+    <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+      <div
+        className="flex-grow-1 mb-3"
+        style={{ overflowY: "auto", minHeight: 0 }}
+      >
+        {tasks.map(task => (
+          <TaskCard key={task.id} id={task.id} task={task} onEditClick={onEditTaskClick} />
+        ))}
+      </div>
+    </SortableContext>
+
+    {/* Add Task Section */}
+    {showInput ? (
+      <div className="mt-auto">
+        {/* Inputs... */}
+      </div>
+    ) : (
+      <button className="btn btn-outline-primary btn-sm mt-auto" onClick={() => setShowInput(true)}>
+        + Add New Task
+      </button>
+    )}
   </div>
-);
-}
+</div>
 
-// EditTaskModal Component
-function EditTaskModal({ task, onSave, onClose }) {
-    const [title, setTitle] = useState(task.title);
-    const [due, setDue] = useState(task.due);
-    const [tags, setTags] = useState(task.tags.join(', ')); // Join for input
-    const [assignee, setAssignee] = useState(task.assignee);
-
-    const handleSave = () => {
-        onSave({
-            ...task, // Keep original ID and other properties
-            title: title.trim(),
-            due: due,
-            tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-            assignee: assignee.trim()
-        });
-        onClose();
-    };
-
-    return (
-        <div className="modal-overlay">
-            <div className="modal-content">
-                <h2>Edit Task</h2>
-                <div className="modal-form-group">
-                    <label htmlFor="edit-title">Title</label>
-                    <input id="edit-title" type="text" value={title} onChange={e => setTitle(e.target.value)} />
-                </div>
-                <div className="modal-form-group">
-                    <label htmlFor="edit-due">Due Date</label>
-                    <input id="edit-due" type="date" value={due} onChange={e => setDue(e.target.value)} />
-                </div>
-                <div className="modal-form-group">
-                    <label htmlFor="edit-tags">Tags (comma-separated)</label>
-                    <input id="edit-tags" type="text" value={tags} onChange={e => setTags(e.target.value)} />
-                </div>
-                <div className="modal-form-group">
-                    <label htmlFor="edit-assignee">Assignee</label>
-                    <input id="edit-assignee" type="text" value={assignee} onChange={e => setAssignee(e.target.value)} />
-                </div>
-                <div className="modal-actions">
-                    <button onClick={handleSave} className="modal-save-btn">Save Changes</button>
-                    <button onClick={onClose} className="modal-cancel-btn">Cancel</button>
-                </div>
-            </div>
-        </div>
     );
 }
 
@@ -390,7 +313,7 @@ export default function TaskboardPage() {
     };
 
 
-    return (
+return (
   <div className="container-fluid py-4">
     <header className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
       <h1 className="h3 fw-bold text-primary">
