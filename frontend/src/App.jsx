@@ -18,10 +18,10 @@ function App() {
         <Router>
             <Routes>
                 {/* Authentication Routes */}
-                <Route path="/" element={<LoginPage />} />
+                <Route path="/" element={<LandingPage />} />
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                <Route path="/landing" element={<LandingPage />} />
+                <Route path="/login" element={<LoginPage />} />
 
                 {/* Main Application Routes */}
                 <Route element={<AppLayout />}>
