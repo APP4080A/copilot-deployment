@@ -32,7 +32,7 @@ function App() {
                 </Route>
 
             {/*Redirect any unmatched routes to login or a 404 page */}
-            <Route path="*" element={<Navigate to="/landing" />} />
+            <Route path="*" element={<Navigate to="/" />} />
             </Routes>
         </Router>
     );

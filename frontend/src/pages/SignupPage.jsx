@@ -92,7 +92,7 @@ export default function SignupPage() {
         console.log('Attempting to navigate to login page...'); // Added console log for debugging
 
         setTimeout(() => {
-          navigate('/');
+          navigate('/login');
           console.log('Navigation to login page initiated.');
         }, 100); // Small delay
       } else {
