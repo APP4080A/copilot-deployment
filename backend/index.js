@@ -10,7 +10,8 @@ const { OAuth2Client } = require('google-auth-library');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const nodemailer = require('nodemailer'); // Import nodemailer
+const nodemailer = require('nodemailer');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const PORT = 5000;
@@ -125,6 +126,14 @@ const db = new sqlite3.Database(dbPath, (err) => {
                             console.error('[DB Schema ERROR] Error getting tasks table info:', pragmaErr.message);
                         } else {
                             console.log('[DB Schema] Tasks table columns:', columns.map(col => col.name).join(', '));
+                        }
+                    });
+                    // NEW: Verify task_assignees table schema
+                    db.all("PRAGMA table_info(task_assignees)", (pragmaErr, columns) => {
+                        if (pragmaErr) {
+                            console.error('[DB Schema ERROR] Error getting task_assignees table info:', pragmaErr.message);
+                        } else {
+                            console.log('[DB Schema] Task Assignees table columns:', columns.map(col => col.name).join(', '));
                         }
                     });
                 }
@@ -458,23 +467,35 @@ app.get('/api/board', (req, res) => {
         // Prepare a promise for each column's tasks
         const taskPromises = columns.map(col => {
             return new Promise((resolve, reject) => {
-                db.all(
-                    "SELECT id, title, description, column_id, due_date, tags, assignee, position FROM tasks WHERE column_id = ? ORDER BY position ASC",
-                    [col.id],
-                    (taskErr, tasks) => {
-                        if (taskErr) {
-                            console.error(`[API GET /api/board ERROR] Error fetching tasks for column ${col.id}:`, taskErr.message);
-                            return reject(taskErr);
-                        }
-                        // Parse tags from JSON string back to array
-                        const parsedTasks = tasks.map(task => ({
-                            ...task,
-                            tags: task.tags ? JSON.parse(task.tags) : []
-                        }));
-                        boardData.columns[col.id] = parsedTasks;
-                        resolve();
+                // Modified query to fetch assignees for each task
+                const tasksSql = `
+                    SELECT
+                        t.id, t.title, t.description, t.column_id, t.due_date, t.tags, t.position, t.priority, t.createdAt,
+                        GROUP_CONCAT(u.username) AS assignees_names,
+                        GROUP_CONCAT(u.id) AS assignees_ids
+                    FROM tasks t
+                    LEFT JOIN task_assignees ta ON t.id = ta.task_id
+                    LEFT JOIN users u ON ta.user_id = u.id
+                    WHERE t.column_id = ?
+                    GROUP BY t.id
+                    ORDER BY t.position ASC
+                `;
+                db.all(tasksSql, [col.id], (taskErr, tasks) => {
+                    if (taskErr) {
+                        console.error(`[API GET /api/board ERROR] Error fetching tasks for column ${col.id}:`, taskErr.message);
+                        return reject(taskErr);
                     }
-                );
+                    // Parse tags from JSON string back to array
+                    const parsedTasks = tasks.map(task => ({
+                        ...task,
+                        tags: task.tags ? JSON.parse(task.tags) : [],
+                        // Convert comma-separated assignees_names/ids back to arrays
+                        assignees: task.assignees_names ? task.assignees_names.split(',') : [],
+                        assignee_ids: task.assignees_ids ? task.assignees_ids.split(',').map(Number) : []
+                    }));
+                    boardData.columns[col.id] = parsedTasks;
+                    resolve();
+                });
             });
         });
 
@@ -489,81 +510,234 @@ app.get('/api/board', (req, res) => {
     });
 });
 
+// Fetches all tasks in a flat list, useful for Team View or global search.
+// Maps DB fields (column_id, assigned_to) to frontend fields (status, assignees)
+app.get('/api/tasks', (req, res) => {
+    // Modified query to fetch all tasks with their assignees
+    const sql = `
+        SELECT
+            t.id, t.title, t.description, t.column_id, t.priority, t.due_date, t.tags, t.createdAt,
+            GROUP_CONCAT(u.username) AS assignees_names,
+            GROUP_CONCAT(u.id) AS assignees_ids
+        FROM tasks t
+        LEFT JOIN task_assignees ta ON t.id = ta.task_id
+        LEFT JOIN users u ON ta.user_id = u.id
+        GROUP BY t.id
+        ORDER BY t.createdAt DESC
+    `;
+    db.all(sql, [], (err, rows) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        const formattedTasks = rows.map(row => ({
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            status: row.column_id, // Map column_id from DB to status for frontend
+            priority: row.priority,
+            due: row.due_date, // Map due_date from DB to due for frontend
+            tags: row.tags ? JSON.parse(row.tags) : [],
+            createdAt: row.createdAt, // Ensure createdAt is mapped
+            // Convert comma-separated assignees_names/ids back to arrays
+            assignees: row.assignees_names ? row.assignees_names.split(',') : [],
+            assignee_ids: row.assignees_ids ? row.assignees_ids.split(',').map(Number) : []
+        }));
+        res.json(formattedTasks);
+    });
+});
 
 
-// Expects: { columnId, title, due, tags, assignee }
+// Expects: { columnId, title, description, due, tags, assignee_ids, priority }
 app.post('/api/tasks', (req, res) => {
-    const { columnId, title, due, tags, assignee } = req.body; // Tags should be an array from frontend
-    const taskId = uuidv4(); // Generate UUID on backend for tasks for consistency
+    const { columnId, title, description, due, tags, assignee_ids, priority } = req.body; // Expect assignee_ids array
+    const taskId = uuidv4();
+    const createdAt = new Date().toISOString().split('T')[0];
 
     if (!columnId || !title) {
         return res.status(400).json({ message: 'Column ID and task title are required.' });
     }
 
-    // Get the highest position in the column to add the new task at the end
-    db.get("SELECT MAX(position) as max_position FROM tasks WHERE column_id = ?", [columnId], (err, row) => {
-        if (err) {
-            console.error('[API POST /api/tasks ERROR] Error getting max position:', err.message);
-            return res.status(500).json({ message: 'Error adding task.' });
-        }
+    db.serialize(() => { // Use serialize for sequential DB operations
+        db.run('BEGIN TRANSACTION;');
 
-        const newPosition = (row.max_position || -1) + 1; // Start from 0 if no tasks exist
-
-        // Convert tags array to JSON string for storage
-        const tagsJson = JSON.stringify(tags || []);
-
-        db.run(
-            `INSERT INTO tasks (id, title, column_id, due_date, tags, assignee, position) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [taskId, title.trim(), columnId, due || null, tagsJson, assignee || 'Unassigned', newPosition],
-            function (insertErr) {
-                if (insertErr) {
-                    console.error('[API POST /api/tasks ERROR] Error inserting new task:', insertErr.message);
-                    return res.status(500).json({ message: 'Error adding task.' });
-                }
-                const newTask = {
-                    id: taskId,
-                    title: title.trim(),
-                    column_id: columnId,
-                    due_date: due || 'TBD',
-                    tags: tags || [],
-                    assignee: assignee || 'Unassigned',
-                    position: newPosition
-                };
-                res.status(201).json({ message: 'Task added successfully!', task: newTask });
+        db.get("SELECT MAX(position) as max_position FROM tasks WHERE column_id = ?", [columnId], (err, row) => {
+            if (err) {
+                console.error('[API POST /api/tasks ERROR] Error getting max position:', err.message);
+                db.run('ROLLBACK;');
+                return res.status(500).json({ message: 'Error adding task.' });
             }
-        );
+
+            const newPosition = (row.max_position || -1) + 1;
+            const tagsJson = JSON.stringify(tags || []);
+
+            // Insert into tasks table (without assignee column)
+            db.run(
+                `INSERT INTO tasks (id, title, description, column_id, due_date, tags, position, priority, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [taskId, title.trim(), description || '', columnId, due || null, tagsJson, newPosition, priority || 'Low', createdAt],
+                function (insertErr) {
+                    if (insertErr) {
+                        console.error('[API POST /api/tasks ERROR] Error inserting new task:', insertErr.message);
+                        db.run('ROLLBACK;');
+                        return res.status(500).json({ message: 'Error adding task.' });
+                    }
+
+                    // Insert into task_assignees table for each assignee
+                    if (assignee_ids && assignee_ids.length > 0) {
+                        const assigneesPromises = assignee_ids.map(userId => {
+                            return new Promise((resolve, reject) => {
+                                db.run(`INSERT INTO task_assignees (task_id, user_id) VALUES (?, ?)`, [taskId, userId], function(assigneeErr) {
+                                    if (assigneeErr) {
+                                        console.error(`[API POST /api/tasks ERROR] Error assigning user ${userId} to task ${taskId}:`, assigneeErr.message);
+                                        return reject(assigneeErr);
+                                    }
+                                    resolve();
+                                });
+                            });
+                        });
+
+                        Promise.all(assigneesPromises)
+                            .then(() => {
+                                db.run('COMMIT;', (commitErr) => {
+                                    if (commitErr) {
+                                        console.error('[API POST /api/tasks ERROR] Error committing transaction after task and assignees insertion:', commitErr.message);
+                                        return res.status(500).json({ message: 'Error committing task and assignees.' });
+                                    }
+                                    // Fetch assigned user names to return in response
+                                    db.all(`SELECT username FROM users WHERE id IN (${assignee_ids.join(',')})`, [], (fetchErr, users) => {
+                                        if (fetchErr) {
+                                            console.error('[API POST /api/tasks ERROR] Error fetching assignee names:', fetchErr.message);
+                                            // Still return success, but with potentially incomplete assignee info
+                                            return res.status(201).json({ message: 'Task added successfully, but assignee names could not be fetched.', task: { id: taskId, title: title.trim(), description: description || '', status: columnId, due: due || 'TBD', tags: tags || [], assignees: [], assignee_ids: assignee_ids, priority: priority || 'Low', createdAt: createdAt } });
+                                        }
+                                        const assigneesNames = users.map(u => u.username);
+                                        const newTask = {
+                                            id: taskId,
+                                            title: title.trim(),
+                                            description: description || '',
+                                            status: columnId,
+                                            due: due || 'TBD',
+                                            tags: tags || [],
+                                            assignees: assigneesNames, // Return array of names
+                                            assignee_ids: assignee_ids, // Return array of IDs
+                                            priority: priority || 'Low',
+                                            createdAt: createdAt
+                                        };
+                                        res.status(201).json({ message: 'Task added successfully!', task: newTask });
+                                    });
+                                });
+                            })
+                            .catch(error => {
+                                db.run('ROLLBACK;');
+                                res.status(500).json({ message: 'Error adding task assignees.', error: error.message });
+                            });
+                    } else {
+                        // If no assignees, just commit the task insertion
+                        db.run('COMMIT;', (commitErr) => {
+                            if (commitErr) {
+                                console.error('[API POST /api/tasks ERROR] Error committing transaction after task insertion (no assignees):', commitErr.message);
+                                return res.status(500).json({ message: 'Error committing task.' });
+                            }
+                            const newTask = {
+                                id: taskId,
+                                title: title.trim(),
+                                description: description || '',
+                                status: columnId,
+                                due: due || 'TBD',
+                                tags: tags || [],
+                                assignees: [], // No assignees
+                                assignee_ids: [], // No assignees
+                                priority: priority || 'Low',
+                                createdAt: createdAt
+                            };
+                            res.status(201).json({ message: 'Task added successfully!', task: newTask });
+                        });
+                    }
+                }
+            );
+        });
     });
 });
 
 
-// Expects: { title, due, tags, assignee } in body
+// Expects: { title, description, due, tags, assignee_ids, priority } in body
 app.put('/api/tasks/:id', (req, res) => {
     const { id } = req.params;
-    const { title, due, tags, assignee } = req.body;
+    const { title, description, due, tags, assignee_ids, priority } = req.body; // Expect assignee_ids array
 
     if (!title) {
         return res.status(400).json({ message: 'Task title is required.' });
     }
 
-    // Convert tags array to JSON string for storage
     const tagsJson = JSON.stringify(tags || []);
 
-    db.run(
-        `UPDATE tasks SET title = ?, due_date = ?, tags = ?, assignee = ? WHERE id = ?`,
-        [title.trim(), due || null, tagsJson, assignee || 'Unassigned', id],
-        function (updateErr) {
-            if (updateErr) {
-                console.error(`[API PUT /api/tasks/${id} ERROR] Error updating task:`, updateErr.message);
-                return res.status(500).json({ message: 'Error updating task.' });
-            }
-            if (this.changes === 0) {
-                return res.status(404).json({ message: 'Task not found.' });
-            }
-            res.status(200).json({ message: 'Task updated successfully!' });
-        }
-    );
-});
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION;');
 
+        db.run(
+            `UPDATE tasks SET title = ?, description = ?, due_date = ?, tags = ?, priority = ? WHERE id = ?`,
+            [title.trim(), description || '', due || null, tagsJson, priority || 'Low', id],
+            function (updateErr) {
+                if (updateErr) {
+                    console.error(`[API PUT /api/tasks/${id} ERROR] Error updating task details:`, updateErr.message);
+                    db.run('ROLLBACK;');
+                    return res.status(500).json({ message: 'Error updating task.' });
+                }
+                if (this.changes === 0) {
+                    // Task not found or no changes to main task details
+                    // Still proceed to update assignees if task found
+                }
+
+                // Update assignees: Delete existing and insert new ones
+                db.run(`DELETE FROM task_assignees WHERE task_id = ?`, [id], (deleteAssigneesErr) => {
+                    if (deleteAssigneesErr) {
+                        console.error(`[API PUT /api/tasks/${id} ERROR] Error deleting old assignees:`, deleteAssigneesErr.message);
+                        db.run('ROLLBACK;');
+                        return res.status(500).json({ message: 'Error updating task assignees.' });
+                    }
+
+                    if (assignee_ids && assignee_ids.length > 0) {
+                        const assigneesPromises = assignee_ids.map(userId => {
+                            return new Promise((resolve, reject) => {
+                                db.run(`INSERT INTO task_assignees (task_id, user_id) VALUES (?, ?)`, [id, userId], function(assigneeErr) {
+                                    if (assigneeErr) {
+                                        console.error(`[API PUT /api/tasks/${id} ERROR] Error assigning user ${userId} to task ${id}:`, assigneeErr.message);
+                                        return reject(assigneeErr);
+                                    }
+                                    resolve();
+                                });
+                            });
+                        });
+
+                        Promise.all(assigneesPromises)
+                            .then(() => {
+                                db.run('COMMIT;', (commitErr) => {
+                                    if (commitErr) {
+                                        console.error('[API PUT /api/tasks/id ERROR] Error committing transaction after task and assignees update:', commitErr.message);
+                                        return res.status(500).json({ message: 'Error committing task and assignees update.' });
+                                    }
+                                    res.status(200).json({ message: 'Task and assignees updated successfully!' });
+                                });
+                            })
+                            .catch(error => {
+                                db.run('ROLLBACK;');
+                                res.status(500).json({ message: 'Error updating task assignees.', error: error.message });
+                            });
+                    } else {
+                        // No assignees provided, just commit the main task update (and assignees were already deleted)
+                        db.run('COMMIT;', (commitErr) => {
+                            if (commitErr) {
+                                console.error('[API PUT /api/tasks/id ERROR] Error committing transaction after task update (no assignees):', commitErr.message);
+                                return res.status(500).json({ message: 'Error committing task update.' });
+                            }
+                            res.status(200).json({ message: 'Task updated successfully!' });
+                        });
+                    }
+                });
+            }
+        );
+    });
+});
 
 // Expects: { sourceColumnId, destColumnId, newIndex } in body
 app.put('/api/tasks/:id/move', (req, res) => {
@@ -650,38 +824,47 @@ app.delete('/api/tasks/:id', (req, res) => {
         db.serialize(() => {
             db.run('BEGIN TRANSACTION;');
 
-            // Delete the task
-            db.run(`DELETE FROM tasks WHERE id = ?`, [id], function (deleteErr) {
-                if (deleteErr) {
-                    console.error(`[API DELETE /api/tasks/${id} ERROR] Error deleting task:`, deleteErr.message);
+            // Delete assignees for the task first (due to ON DELETE CASCADE this might not be strictly needed but good practice)
+            db.run(`DELETE FROM task_assignees WHERE task_id = ?`, [id], (deleteAssigneesErr) => {
+                if (deleteAssigneesErr) {
+                    console.error(`[API DELETE /api/tasks/${id} ERROR] Error deleting task assignees:`, deleteAssigneesErr.message);
                     db.run('ROLLBACK;');
-                    return res.status(500).json({ message: 'Error deleting task.' });
-                }
-                if (this.changes === 0) {
-                    db.run('ROLLBACK;');
-                    return res.status(404).json({ message: 'Task not found during deletion.' });
+                    return res.status(500).json({ message: 'Error deleting task assignees.' });
                 }
 
-                // Shift positions of remaining tasks in the same column
-                db.run(
-                    `UPDATE tasks SET position = position - 1 WHERE column_id = ? AND position > ?`,
-                    [columnIdOfDeletedTask, deletedPosition],
-                    (shiftErr) => {
-                        if (shiftErr) {
-                            console.error(`[API DELETE /api/tasks/${id} ERROR] Error shifting positions after deletion:`, shiftErr.message);
-                            db.run('ROLLBACK;');
-                            return res.status(500).json({ message: 'Error shifting task positions.' });
-                        }
-
-                        db.run('COMMIT;', (commitErr) => {
-                            if (commitErr) {
-                                console.error('[API DELETE /api/tasks/id ERROR] Error committing transaction after task deletion:', commitErr.message);
-                                return res.status(500).json({ message: 'Error committing task deletion.' });
-                            }
-                            res.status(200).json({ message: 'Task deleted successfully!' });
-                        });
+                // Delete the task
+                db.run(`DELETE FROM tasks WHERE id = ?`, [id], function (deleteErr) {
+                    if (deleteErr) {
+                        console.error(`[API DELETE /api/tasks/${id} ERROR] Error deleting task:`, deleteErr.message);
+                        db.run('ROLLBACK;');
+                        return res.status(500).json({ message: 'Error deleting task.' });
                     }
-                );
+                    if (this.changes === 0) {
+                        db.run('ROLLBACK;');
+                        return res.status(404).json({ message: 'Task not found during deletion.' });
+                    }
+
+                    // Shift positions of remaining tasks in the same column
+                    db.run(
+                        `UPDATE tasks SET position = position - 1 WHERE column_id = ? AND position > ?`,
+                        [columnIdOfDeletedTask, deletedPosition],
+                        (shiftErr) => {
+                            if (shiftErr) {
+                                console.error(`[API DELETE /api/tasks/${id} ERROR] Error shifting positions after deletion:`, shiftErr.message);
+                                db.run('ROLLBACK;');
+                                return res.status(500).json({ message: 'Error shifting task positions.' });
+                            }
+
+                            db.run('COMMIT;', (commitErr) => {
+                                if (commitErr) {
+                                    console.error('[API DELETE /api/tasks/id ERROR] Error committing transaction after task deletion:', commitErr.message);
+                                    return res.status(500).json({ message: 'Error committing task deletion.' });
+                                }
+                                res.status(200).json({ message: 'Task deleted successfully!' });
+                            });
+                        }
+                    );
+                });
             });
         });
     });
@@ -812,6 +995,97 @@ app.delete('/api/columns/:id', (req, res) => {
                 }
             );
         });
+    });
+});
+
+// --- User Management Endpoints ---
+
+// GET a single user's details by ID
+app.get('/api/users/:id', (req, res) => {
+    const { id } = req.params;
+    const sql = "SELECT id, username, email, createdAt FROM users WHERE id = ?";
+    db.get(sql, [id], (err, row) => {
+        if (err) {
+            console.error(`[API GET /api/users/${id} ERROR] Error fetching user:`, err.message);
+            return res.status(500).json({ message: 'Error fetching user details.' });
+        }
+        if (!row) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        res.status(200).json(row);
+    });
+});
+
+// PUT (Edit) a user's details by ID
+// Expects: { username, email, role } in body
+app.put('/api/users/:id', (req, res) => {
+    const { id } = req.params;
+    const { username, email, role } = req.body;
+
+    if (!username || !email || !role) {
+        return res.status(400).json({ message: 'Username, email, and role are required.' });
+    }
+
+    const sql = `UPDATE users SET username = ?, email = ?, role = ? WHERE id = ?`;
+    db.run(sql, [username, email, role, id], function(err) {
+        if (err) {
+            console.error(`[API PUT /api/users/${id} ERROR] Error updating user:`, err.message);
+            return res.status(500).json({ message: 'Error updating user.' });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ message: 'User not found or no changes made.' });
+        }
+        res.status(200).json({ message: 'User updated successfully!' });
+    });
+});
+
+// DELETE a user by ID
+app.delete('/api/users/:id', (req, res) => {
+    const { id } = req.params;
+
+    // A crucial step: Decide how to handle tasks assigned to this user.
+    // We will update their `assignee` to 'Unassigned' to avoid data integrity issues.
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION;');
+
+        // Step 1: Update tasks assigned to this user
+        // This logic needs to be updated for multi-assignee.
+        // Instead of setting to 'Unassigned', we should remove the user from task_assignees.
+        // For now, we'll just delete the user, and the ON DELETE CASCADE on task_assignees will handle it.
+        // If you want to reassign tasks, that would be a more complex logic.
+
+        // Step 2: Delete the user
+        db.run(`DELETE FROM users WHERE id = ?`, [id], function(deleteErr) {
+            if (deleteErr) {
+                console.error(`[API DELETE /api/users/${id} ERROR] Error deleting user:`, deleteErr.message);
+                db.run('ROLLBACK;');
+                return res.status(500).json({ message: 'Error deleting user.' });
+            }
+            if (this.changes === 0) {
+                db.run('ROLLBACK;');
+                return res.status(404).json({ message: 'User not found.' });
+            }
+
+            db.run('COMMIT;', (commitErr) => {
+                if (commitErr) {
+                    console.error('[API DELETE /api/users/id ERROR] Error committing transaction after user deletion:', commitErr.message);
+                    return res.status(500).json({ message: 'Error committing user deletion.' });
+                }
+                res.status(200).json({ message: 'User deleted successfully!' });
+            });
+        });
+    });
+});
+
+// GET all users (team members)
+app.get('/api/users', (req, res) => {
+    const sql = "SELECT id, username, email, role, createdAt FROM users";
+    db.all(sql, [], (err, rows) => {
+        if (err) {
+            console.error('[API GET /api/users ERROR] Error fetching users:', err.message);
+            return res.status(500).json({ message: 'Error fetching team members.' });
+        }
+        res.status(200).json(rows);
     });
 });
 

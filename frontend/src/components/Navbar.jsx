@@ -1,16 +1,17 @@
 // frontend/src/components/Navbar.jsx
-import React, { useState, useContext } from 'react'; // Import useContext
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 
-// Import the user avatar image directly
-import userAvatar from '../assets/useravatar.jpg'; // Adjust path if assets is not directly in 'src'
-import { TaskContext } from '../contexts/TaskContext'; // Import TaskContext
+import userAvatar from '../assets/useravatar.jpg';
+import { useSearch } from '../contexts/SearchContext';
 
 function Navbar() {
     const location = useLocation();
-    const [searchTerm, setSearchTerm] = useState(''); // State for the search input
-    const { setGlobalSearchTerm } = useContext(TaskContext); // Get the setter for global search term from context
+
+
+    // Use the global search context
+    const { searchTerm, setSearchTerm } = useSearch();
 
     // Function to handle search input change
     const handleSearchChange = (e) => {
@@ -19,11 +20,7 @@ function Navbar() {
 
     // Function to handle search button click or Enter key press
     const handleSearchSubmit = () => {
-        // Update the global search term in the context
-        setGlobalSearchTerm(searchTerm);
-        console.log("Searching for:", searchTerm);
-        // In a real application, you might also navigate to a specific page
-        // if the search is meant to initiate a new view (e.g., /search-results?q=searchTerm)
+        console.log("Global search term updated to:", searchTerm);
     };
 
     // Handle Enter key press in the search input
@@ -34,16 +31,16 @@ function Navbar() {
     };
 
     return (
-        // Use Bootstrap's responsive navbar classes
-        // navbar-expand-lg makes it collapse on screens smaller than 'lg'
-        // bg-white and shadow-sm for styling
-        // p-3 for padding, sticky-top to keep it at the top
         <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm p-3 sticky-top">
-            <div className="container-fluid"> {/* Use container-fluid for full width */}
+            <div className="container-fluid">
                 {/* Navbar Brand/Logo */}
                 <Link to="/dashboard" className="navbar-brand d-flex align-items-center">
-                    {/* Placeholder for your actual logo. Can be an img or SVG. */}
-                    <div className="me-2" style={{ width: '32px', height: '32px', backgroundColor: '#6941C6', borderRadius: '50%' }}></div>
+                    <img
+                        src="https://img.icons8.com/arcade/64/c-key.png"
+                        alt="Co-Pilot Logo"
+                        className="me-2"
+                        style={{ width: '32px', height: '32px' }}
+                    />
                     <span className="fw-bold fs-5 text-dark">Co-Pilot</span>
                 </Link>
 
@@ -94,18 +91,17 @@ function Navbar() {
                                 className="form-control"
                                 placeholder="Search tasks, teams, users…"
                                 aria-label="Search"
-                                value={searchTerm} // Controlled component
-                                onChange={handleSearchChange} // Update state on change
-                                onKeyPress={handleKeyPress} // Handle Enter key
+                                value={searchTerm}
+                                onChange={handleSearchChange}
+                                onKeyPress={handleKeyPress}
                             />
                             <button className="btn btn-outline-secondary" type="button" onClick={handleSearchSubmit}>
-                                <i className="bi bi-search"></i> {/* Bootstrap search icon */}
+                                <i className="bi bi-search"></i>
                             </button>
                         </div>
                         {/* User Avatar */}
                         <div className="dropdown">
                             <a className="d-block link-dark text-decoration-none dropdown-toggle" href="#" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false">
-                                {/* Use the imported image variable here */}
                                 <img src={userAvatar} alt="User Avatar" width="40" height="40" className="rounded-circle" />
                             </a>
                             <ul className="dropdown-menu text-small shadow" aria-labelledby="dropdownUser">

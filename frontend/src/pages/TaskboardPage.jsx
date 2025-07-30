@@ -1,12 +1,12 @@
 // frontend/src/pages/TaskboardPage.jsx
 import React, { useState, useContext, useMemo } from 'react';
-import './styles/TaskboardTest.css'; // We'll keep this for unique styles
+import './styles/TaskboardTest.css';
 import { DndContext, closestCenter, DragOverlay } from '@dnd-kit/core';
-import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable'; // Added rectSortingStrategy
-import { CSS } from '@dnd-kit/utilities';
+import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities'; // Correct import for CSS utility
 
 import { TaskContext } from '../contexts/TaskContext';
-
+import { useSearch } from '../contexts/SearchContext'; // Re-import the search context
 
 
 // Helper function to format column titles
@@ -20,42 +20,60 @@ function TaskCard({ task, id, isOverlay = false, onEditClick }) {
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        // Custom styles for overlay (more robust for D&D)
         ...(isOverlay && {
             boxShadow: '0 8px 16px rgba(0, 0, 0, 0.2)',
             cursor: 'grabbing',
             zIndex: 999,
-            opacity: 0.9 // Make it slightly transparent
+            opacity: 0.9
         })
     };
 
     const handleEditButtonClick = (e) => {
-        e.stopPropagation(); // Prevent drag event from firing when clicking edit
+        e.stopPropagation();
         onEditClick(task);
     };
 
+    const getPriorityBadgeClass = (priority) => {
+        if (typeof priority !== 'string') return 'bg-secondary';
+        switch (priority.toLowerCase()) {
+            case 'high': return 'bg-danger';
+            case 'medium': return 'bg-warning text-dark';
+            case 'low': return 'bg-info';
+            default: return 'bg-secondary';
+        }
+    };
+
     return (
-        // Using Bootstrap classes: card for container, mb-2 for margin-bottom, shadow-sm for subtle shadow, p-3 for padding
         <div ref={setNodeRef} style={style} className="card mb-2 shadow-sm task-card-custom-min-height">
-            <div className="card-body p-3" {...attributes} {...listeners}> {/* p-3 for padding, card-body for flex */}
-                <h5 className="card-title fw-bold mb-1">{task.title}</h5> {/* mb-1 for smaller margin */}
-                <p className="card-text text-muted small mb-2">📅 {task.due}</p> {/* small text, mb-2 */}
-                <div className="d-flex flex-wrap gap-1 mb-2"> {/* d-flex flex-wrap for tags, gap-1 for spacing */}
-                    {task.tags.map((tag, idx) => (
-                        <span key={idx} className="badge bg-info-subtle text-info fw-normal text-uppercase py-1 px-2 rounded-pill custom-tag-style">{tag}</span> /* Bootstrap badges */
-                    ))}
+            <div className="card-body p-3" {...attributes} {...listeners}>
+                <h5 className="card-title fw-bold mb-1">{task.title}</h5>
+                <p className="card-text text-muted small mb-2">
+                    <i className="bi bi-calendar me-1"></i> {task.due}
+                </p>
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                    <div className="d-flex flex-wrap gap-1">
+                        {task.tags?.map((tag, idx) => (
+                            <span key={idx} className="badge bg-info-subtle text-info fw-normal text-uppercase py-1 px-2 rounded-pill custom-tag-style">{tag}</span>
+                        ))}
+                    </div>
+                    {task.priority && (
+                        <span className={`badge ${getPriorityBadgeClass(task.priority)}`}>{task.priority}</span>
+                    )}
                 </div>
-                <div className="text-muted small">👤 {task.assignee}</div> {/* text-muted small */}
+                <div className="text-muted small">
+                    <i className="bi bi-person me-1"></i>
+                    {task.assignee}
+                </div>
             </div>
-            {/* Using Bootstrap button classes: btn btn-sm btn-outline-secondary */}
-            <button className="btn btn-sm btn-outline-secondary task-edit-btn-custom" onClick={handleEditButtonClick}>Edit</button>
+            <button className="btn btn-sm btn-outline-secondary task-edit-btn-custom" onClick={handleEditButtonClick} title="Edit Task">
+                <i className="bi bi-pencil"></i>
+            </button>
         </div>
     );
 }
 
-// Column Component - Now also sortable itself
+// Column Component
 function Column({ id, title, tasks, onAddTask, onDeleteColumn, onEditTaskClick }) {
-    // useSortable for the column itself (for column reordering)
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: id });
 
     const style = {
@@ -65,33 +83,36 @@ function Column({ id, title, tasks, onAddTask, onDeleteColumn, onEditTaskClick }
 
     const [showInput, setShowInput] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [newTaskDescription, setNewTaskDescription] = useState('');
     const [newTaskDue, setNewTaskDue] = useState('');
     const [newTaskTags, setNewTaskTags] = useState('');
     const [newTaskAssignee, setNewTaskAssignee] = useState('');
+    const [newTaskPriority, setNewTaskPriority] = useState('Low');
 
     const handleAddNewTask = () => {
         if (newTaskTitle.trim()) {
-            onAddTask(id, { // Call context's addTask
+            onAddTask(id, {
                 title: newTaskTitle.trim(),
+                description: newTaskDescription.trim() || 'No description provided.',
                 due: newTaskDue,
                 tags: newTaskTags.split(',').map(tag => tag.trim()).filter(tag => tag),
-                assignee: newTaskAssignee
+                assignee: newTaskAssignee,
+                priority: newTaskPriority
             });
             setNewTaskTitle('');
+            setNewTaskDescription('');
             setNewTaskDue('');
             setNewTaskTags('');
             setNewTaskAssignee('');
+            setNewTaskPriority('Low');
             setShowInput(false);
         }
     };
 
     return (
-        // Apply useSortable props to the outer div of the column
-        // Using Bootstrap col classes for responsive grid layout
-        <div ref={setNodeRef} style={style} className="col-12 col-sm-6 col-md-4 col-lg-3 mb-4"> {/* col-lg-3 for 4 per row on large screens, mb-4 for margin-bottom */}
-            {/* Inner card for column styling */}
-            <div className="card border-0 bg-light p-3 h-100 column-inner-card"> {/* h-100 to make all cards same height */}
-                <div className="d-flex justify-content-between align-items-center mb-3" {...attributes} {...listeners}> {/* Apply drag attributes/listeners here */}
+        <div ref={setNodeRef} style={style} className="col-12 col-sm-6 col-md-4 col-lg-3 mb-4">
+            <div className="card border-0 bg-light p-3 h-100 column-inner-card">
+                <div className="d-flex justify-content-between align-items-center mb-3" {...attributes} {...listeners}>
                     <h4 className="mb-0 text-capitalize">{title} <span className="badge bg-secondary rounded-pill ms-2">{tasks.length}</span></h4>
                     {onDeleteColumn && (
                         <button onClick={() => onDeleteColumn(id)} className="btn btn-sm btn-outline-danger" aria-label={`Delete column ${title}`}>
@@ -99,7 +120,6 @@ function Column({ id, title, tasks, onAddTask, onDeleteColumn, onEditTaskClick }
                         </button>
                     )}
                 </div>
-                {/* SortableContext for tasks within this column */}
                 <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                     <div className="task-list-container-custom flex-grow-1 overflow-auto pe-1">
                         {tasks.map((task) => (
@@ -115,6 +135,13 @@ function Column({ id, title, tasks, onAddTask, onDeleteColumn, onEditTaskClick }
                             onChange={e => setNewTaskTitle(e.target.value)}
                             placeholder="Task title"
                             className="form-control mb-2"
+                        />
+                        <textarea
+                            value={newTaskDescription}
+                            onChange={e => setNewTaskDescription(e.target.value)}
+                            placeholder="Task description"
+                            className="form-control mb-2"
+                            rows="2"
                         />
                         <input
                             type="date"
@@ -137,6 +164,15 @@ function Column({ id, title, tasks, onAddTask, onDeleteColumn, onEditTaskClick }
                             placeholder="Assignee"
                             className="form-control mb-2"
                         />
+                        <select
+                            value={newTaskPriority}
+                            onChange={e => setNewTaskPriority(e.target.value)}
+                            className="form-select mb-2"
+                        >
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                        </select>
                         <div className="d-grid gap-2">
                             <button onClick={handleAddNewTask} className="btn btn-primary">
                                 Add Task
@@ -154,26 +190,29 @@ function Column({ id, title, tasks, onAddTask, onDeleteColumn, onEditTaskClick }
     );
 }
 
-// EditTaskModal Component (remains the same)
+// EditTaskModal Component
 function EditTaskModal({ task, onSave, onClose }) {
     const [title, setTitle] = useState(task.title);
     const [due, setDue] = useState(task.due);
-    const [tags, setTags] = useState(task.tags.join(', '));
+    const [tags, setTags] = useState(task.tags?.join(', '));
     const [assignee, setAssignee] = useState(task.assignee);
+    const [description, setDescription] = useState(task.description || '');
+    const [priority, setPriority] = useState(task.priority || 'Low');
 
     const handleSave = () => {
         onSave({
             ...task,
             title: title.trim(),
+            description: description.trim(),
             due: due,
-            tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-            assignee: assignee.trim()
+            tags: tags?.split(',').map(tag => tag.trim()).filter(tag => tag),
+            assignee: assignee.trim(),
+            priority: priority
         });
         onClose();
     };
 
     return (
-        // Using Bootstrap's modal structure and utility classes for layout
         <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
             <div className="modal-dialog modal-dialog-centered">
                 <div className="modal-content">
@@ -187,6 +226,10 @@ function EditTaskModal({ task, onSave, onClose }) {
                             <input id="edit-title" type="text" className="form-control" value={title} onChange={e => setTitle(e.target.value)} />
                         </div>
                         <div className="mb-3">
+                            <label htmlFor="edit-description" className="form-label">Description</label>
+                            <textarea id="edit-description" className="form-control" value={description} onChange={e => setDescription(e.target.value)} rows="3"></textarea>
+                        </div>
+                        <div className="mb-3">
                             <label htmlFor="edit-due" className="form-label">Due Date</label>
                             <input id="edit-due" type="date" className="form-control" value={due} onChange={e => setDue(e.target.value)} />
                         </div>
@@ -197,6 +240,14 @@ function EditTaskModal({ task, onSave, onClose }) {
                         <div className="mb-3">
                             <label htmlFor="edit-assignee" className="form-label">Assignee</label>
                             <input id="edit-assignee" type="text" className="form-control" value={assignee} onChange={e => setAssignee(e.target.value)} />
+                        </div>
+                        <div className="mb-3">
+                            <label htmlFor="edit-priority" className="form-label">Priority</label>
+                            <select id="edit-priority" className="form-select" value={priority} onChange={e => setPriority(e.target.value)}>
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                            </select>
                         </div>
                     </div>
                     <div className="modal-footer">
@@ -211,7 +262,6 @@ function EditTaskModal({ task, onSave, onClose }) {
 
 // TaskboardPage Main Component
 export default function TaskboardPage() {
-    // Get data and functions from context
     const {
         tasksData,
         columnOrder,
@@ -221,19 +271,38 @@ export default function TaskboardPage() {
         addColumn,
         deleteColumn,
         reorderColumn,
+        fetchTasks // Ensure fetchTasks is destructured here
     } = useContext(TaskContext);
 
     const [newColumnName, setNewColumnName] = useState('');
     const [activeId, setActiveId] = useState(null);
     const [editingTask, setEditingTask] = useState(null);
 
+    // Re-import useSearch and use searchTerm for filtering
+    const { searchTerm } = useSearch();
+
+    // Memoize the filtered tasks based on the global searchTerm
+    const filteredTasks = useMemo(() => {
+        if (!searchTerm) {
+            return tasksData; // If no search term, return all tasks
+        }
+        const lowercasedSearchTerm = searchTerm.toLowerCase();
+        return tasksData.filter(task =>
+            task.title.toLowerCase().includes(lowercasedSearchTerm) ||
+            (task.description && task.description.toLowerCase().includes(lowercasedSearchTerm)) ||
+            (task.assignee && task.assignee.toLowerCase().includes(lowercasedSearchTerm)) ||
+            (task.tags && task.tags.some(tag => tag.toLowerCase().includes(lowercasedSearchTerm)))
+        );
+    }, [tasksData, searchTerm]);
+
+    // Update columns based on filteredTasks
     const columns = useMemo(() => {
         const cols = {};
         columnOrder.forEach(colId => {
-            cols[colId] = tasksData.filter(task => task.status === colId);
+            cols[colId] = filteredTasks.filter(task => task.status === colId);
         });
         return cols;
-    }, [tasksData, columnOrder]);
+    }, [filteredTasks, columnOrder]); // Dependency is now filteredTasks
 
     const handleDragStart = (event) => {
         setActiveId(event.active.id);
@@ -245,21 +314,17 @@ export default function TaskboardPage() {
 
         if (!over) return;
 
-        // Determine if we are dragging a column or a task
         const isDraggingColumn = columnOrder.includes(active.id);
 
         if (isDraggingColumn) {
-            // Column reordering
             if (columnOrder.includes(over.id) && active.id !== over.id) {
                 reorderColumn(active.id, over.id);
             }
         } else {
-            // Task dragging
             let sourceColumnId = null;
             let destColumnId = null;
             let activeTask = null;
 
-            // Find the active task and its source column
             for (const colId in columns) {
                 const taskFound = columns[colId].find(task => task.id === active.id);
                 if (taskFound) {
@@ -271,10 +336,9 @@ export default function TaskboardPage() {
 
             if (!sourceColumnId || !activeTask) return;
 
-            // Determine destination column
-            if (columnOrder.includes(over.id)) { // If 'over' is a column itself
+            if (columnOrder.includes(over.id)) {
                 destColumnId = over.id;
-            } else { // If 'over' is a task, find its parent column
+            } else {
                 for (const colId in columns) {
                     if (columns[colId].some(task => task.id === over.id)) {
                         destColumnId = colId;
@@ -285,14 +349,9 @@ export default function TaskboardPage() {
 
             if (!destColumnId) return;
 
-            // If dragging between different columns, update task status
             if (sourceColumnId !== destColumnId) {
                 updateTaskStatus(active.id, destColumnId);
             }
-            // Note: In-column task reordering is not handled by updateTaskStatus alone.
-            // For full in-column reordering, you'd need a more complex state update in context
-            // that includes order within the column, or use arrayMove on the tasks array
-            // within the specific column in the context's updateTaskStatus.
         }
     };
 
@@ -311,22 +370,16 @@ export default function TaskboardPage() {
 
     const getActiveTask = () => {
         if (!activeId) return null;
-        // Check if activeId is a task ID
-        for (const colId in columns) {
-            const task = columns[colId].find(t => t.id === activeId);
-            if (task) return task;
-        }
-        // If it's not a task, it must be a column (for DragOverlay, though not typically needed for columns)
-        return null;
+        // Search in the original tasksData to find the task.
+        return tasksData.find(t => t.id === activeId);
     };
 
 
     return (
-        <div className="d-flex flex-column min-vh-100 bg-light"> {/* Using Bootstrap for main layout */}
-            {/* Navbar is rendered by AppLayout */}
+        <div className="d-flex flex-column min-vh-100 bg-light">
             <header className="p-4 bg-white shadow-sm d-flex flex-column flex-md-row justify-content-between align-items-md-center sticky-top">
                 <h1 className="h3 mb-2 mb-md-0 text-dark">Task Board <span role="img" aria-label="card-index">🗂️</span></h1>
-                <div className="input-group w-auto"> {/* input-group for inline input and button */}
+                <div className="input-group w-auto">
                     <input
                         type="text"
                         placeholder="New column title"
@@ -337,7 +390,7 @@ export default function TaskboardPage() {
                     <button onClick={() => {
                         if (newColumnName.trim()) {
                             const normalizedName = newColumnName.trim().toLowerCase().replace(/\s+/g, '-');
-                            addColumn(normalizedName); // Call context function
+                            addColumn(normalizedName);
                             setNewColumnName('');
                         }
                     }} className="btn btn-outline-primary">
@@ -346,16 +399,13 @@ export default function TaskboardPage() {
                 </div>
             </header>
 
-            <main className="container-fluid flex-grow-1 p-4"> {/* Use container-fluid for full width, p-4 for padding */}
+            <main className="container-fluid flex-grow-1 p-4">
                 <DndContext
                     collisionDetection={closestCenter}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                 >
-                    {/* SortableContext for columns - now uses rectSortingStrategy for grid */}
                     <SortableContext items={columnOrder} strategy={rectSortingStrategy}>
-                        {/* Use Bootstrap row for wrapping columns, with gutters.
-                            Added h-100 to ensure the row takes full height of its flex-grow-1 parent (main). */}
                         <div className="row g-3 g-lg-4 align-items-stretch h-100">
                             {columnOrder.map(colId => (
                                 <Column
@@ -373,11 +423,6 @@ export default function TaskboardPage() {
 
                     <DragOverlay>
                         {activeId ? (
-                            // Render either a TaskCard or a Column for the overlay
-                            // This gets a bit more complex if you want to show a full column overlay
-                            // For simplicity, we'll assume activeId is a task for overlay for now.
-                            // If activeId is a column, getActiveTask() returns null, so nothing shows.
-                            // To show column overlay, you'd need a separate getActiveColumn function.
                             <TaskCard
                                 id={activeId}
                                 task={getActiveTask()}

@@ -13,6 +13,7 @@ import UserProfilePage from './pages/UserProfilePage.jsx';
 
 import AppLayout from './components/AppLayout.jsx';
 import { TaskProvider } from './contexts/TaskContext.jsx';
+import { SearchProvider } from './contexts/SearchContext.jsx';
 
 function App() {
     return (
@@ -31,7 +32,9 @@ function App() {
                     can access the TaskContext. */}
                 <Route element={
                     <TaskProvider>
-                        <AppLayout />
+                        <SearchProvider> {/* Add SearchProvider here */}
+                            <AppLayout />
+                        </SearchProvider>
                     </TaskProvider>
                 }>
                     <Route path="/dashboard" element={<DashboardPage />} />
