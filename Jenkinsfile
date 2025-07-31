@@ -1,19 +1,22 @@
 pipeline {
     agent any
+
     tools {
-        nodejs 'NodeJS' // Ensure NodeJS is configured in Jenkins
+        nodejs 'NodeJS' // Ensure this matches your Jenkins NodeJS tool name
     }
 
     environment {
-        CI = 'true'
+        FRONTEND_DIR = 'frontend'
+        BACKEND_DIR = 'backend'
     }
 
     stages {
+
         stage('Checkout') {
             steps {
-                git branch: 'main', 
+                git branch: 'main',
                     url: 'https://github.com/APP4080A/copilot-core.git',
-                    credentialsId: 'github-password' // Prefer GitHub token
+                    credentialsId: 'github-password'
             }
         }
 
@@ -21,34 +24,15 @@ pipeline {
             parallel {
                 stage('Frontend Install') {
                     steps {
-                        dir('frontend') {
+                        dir("${FRONTEND_DIR}") {
                             bat 'npm install'
                         }
                     }
                 }
                 stage('Backend Install') {
                     steps {
-                        dir('backend') {
+                        dir("${BACKEND_DIR}") {
                             bat 'npm install'
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Test') {
-            parallel {
-                stage('Frontend Tests') {
-                    steps {
-                        dir('frontend') {
-                            bat 'set CI=true && npm test'
-                        }
-                    }
-                }
-                stage('Backend Tests') {
-                    steps {
-                        dir('backend') {
-                            bat 'npm test'
                         }
                     }
                 }
@@ -59,24 +43,59 @@ pipeline {
             parallel {
                 stage('Frontend Build') {
                     steps {
-                        dir('frontend') {
+                        dir("${FRONTEND_DIR}") {
                             bat 'npm run build'
                         }
                     }
                 }
-               // stage('Backend Build') {
-                  //  steps {
-                    //    dir('backend') {
-                     //       bat 'npm run build'
-                     //   }
-                  //  }
-               // }
+                stage('Backend Build') {
+                    steps {
+                        dir("${BACKEND_DIR}") {
+                            bat 'echo "Backend build complete (nothing to compile)"'
+                        }
+                    }
+                }
             }
         }
 
-        stage('Simulate Deploy') {
-            steps {
-                echo 'Skipping backend server startup in CI environment.'
+        stage('Test') {
+            parallel {
+                stage('Frontend Tests') {
+                    steps {
+                        dir("${FRONTEND_DIR}") {
+                            bat 'set CI=true && npm test'
+                        }
+                    }
+                }
+                stage('Backend Tests') {
+                    steps {
+                        dir("${BACKEND_DIR}") {
+                            bat 'npm test'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            parallel {
+                stage('Deploy Frontend') {
+                    steps {
+                        dir("${FRONTEND_DIR}\\dist") {
+                            bat 'xcopy /E /I /Y . C:\\deploy\\frontend\\'
+                        }
+                    }
+                }
+                stage('Deploy Backend') {
+                    steps {
+                        dir("${BACKEND_DIR}") {
+                            bat '''
+                                npm install -g pm2
+                                pm2 restart index.js || pm2 start index.js
+                            '''
+                        }
+                    }
+                }
             }
         }
     }
