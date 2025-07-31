@@ -110,7 +110,7 @@ function Column({ id, title, tasks, onAddTask, onDeleteColumn, onEditTaskClick }
     };
 
     return (
-        <div ref={setNodeRef} style={style} className="col-12 col-sm-6 col-md-4 col-lg-3 mb-4">
+        <div ref={setNodeRef} style={{minWidth: '300px'}} className="col-12 col-sm-6 col-md-4 col-lg-3 mb-4">
             <div className="card border-0 bg-light p-3 h-100 column-inner-card">
                 <div className="d-flex justify-content-between align-items-center mb-3" {...attributes} {...listeners}>
                     <h4 className="mb-0 text-capitalize">{title} <span className="badge bg-secondary rounded-pill ms-2">{tasks.length}</span></h4>
