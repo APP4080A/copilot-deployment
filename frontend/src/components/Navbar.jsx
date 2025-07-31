@@ -1,121 +1,99 @@
-// frontend/src/components/Navbar.jsx
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React from 'react';
+import Navbar from '../components/Navbar';
 
+export default function ProfilePage({ profile }) {
+  // Backend should pass this object:
+  const {
+    email = 'jdoe.copilot@example.com',
+    username = 'jdoe.mobbin@gmail.com',
+    avatar = '', // if empty, fallback will be used
+    linkedAccounts = {
+      google: 'jdoe.copilot@gmail.com',
+      slack: '@jdoe-dev',
+      jira: 'jdoe'
+    }
+  } = profile || {};
 
-import userAvatar from '../assets/useravatar.jpg';
-import { useSearch } from '../contexts/SearchContext';
+  const defaultAvatar = 'https://img.icons8.com/arcade/64/c-key.png';
+  const userAvatar = avatar || defaultAvatar;
 
-function Navbar() {
-    const location = useLocation();
+  return (
+    <div className="d-flex flex-column min-vh-100 bg-light">
+      <Navbar />
 
+      <main className="container-fluid flex-grow-1 p-4">
+        <h2 className="mb-4 fw-bold">User Profile</h2>
 
-    // Use the global search context
-    const { searchTerm, setSearchTerm } = useSearch();
+        {/* Profile Header */}
+        <div className="card p-4 mb-4 d-flex flex-column flex-md-row align-items-center align-items-md-start text-center text-md-start shadow-sm gap-4">
+          <img
+            src={userAvatar}
+            alt="User Avatar"
+            width="100"
+            height="100"
+            className="rounded-circle"
+            style={{ objectFit: 'cover' }}
+          />
+          <div>
+            <h4 className="fw-bold mb-1">{email}</h4>
+            <p className="text-muted small mb-2">{username}</p>
+            <button className="btn btn-outline-primary btn-sm">Edit Profile</button>
+          </div>
+        </div>
 
-    // Function to handle search input change
-    const handleSearchChange = (e) => {
-        setSearchTerm(e.target.value);
-    };
-
-    // Function to handle search button click or Enter key press
-    const handleSearchSubmit = () => {
-        console.log("Global search term updated to:", searchTerm);
-    };
-
-    // Handle Enter key press in the search input
-    const handleKeyPress = (e) => {
-        if (e.key === 'Enter') {
-            handleSearchSubmit();
-        }
-    };
-
-    return (
-        <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm p-3 sticky-top">
-            <div className="container-fluid">
-                {/* Navbar Brand/Logo */}
-                <Link to="/dashboard" className="navbar-brand d-flex align-items-center">
-                    <img
-                        src="https://img.icons8.com/arcade/64/c-key.png"
-                        alt="Co-Pilot Logo"
-                        className="me-2"
-                        style={{ width: '32px', height: '32px' }}
-                    />
-                    <span className="fw-bold fs-5 text-dark">Co-Pilot</span>
-                </Link>
-
-                {/* Toggler for mobile view */}
-                <button
-                    className="navbar-toggler"
-                    type="button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#navbarNav"
-                    aria-controls="navbarNav"
-                    aria-expanded="false"
-                    aria-label="Toggle navigation"
-                >
-                    <span className="navbar-toggler-icon"></span>
-                </button>
-
-                {/* Navbar Collapse - contains nav links, search, and user avatar */}
-                <div className="collapse navbar-collapse" id="navbarNav">
-                    {/* Navigation Links */}
-                    <ul className="navbar-nav me-auto mb-2 mb-lg-0"> {/* me-auto pushes other items to the right */}
-                        <li className="nav-item">
-                            <Link to="/dashboard" className={`nav-link ${location.pathname === '/dashboard' ? 'active text-primary fw-bold' : 'text-dark'}`}>
-                                Dashboard
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link to="/team" className={`nav-link ${location.pathname === '/team' ? 'active text-primary fw-bold' : 'text-dark'}`}>
-                                Team
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link to="/tasks" className={`nav-link ${location.pathname === '/tasks' ? 'active text-primary fw-bold' : 'text-dark'}`}>
-                                Task Board
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link to="/profile" className={`nav-link ${location.pathname === '/profile' ? 'active text-primary fw-bold' : 'text-dark'}`}>
-                                Profile
-                            </Link>
-                        </li>
-                    </ul>
-
-                    {/* Search Bar and User Avatar - aligned to the right */}
-                    <div className="d-flex align-items-center ms-lg-auto"> {/* ms-lg-auto pushes this group to the far right on large screens */}
-                        <div className="input-group me-3"> {/* me-3 for spacing */}
-                            <input
-                                type="text"
-                                className="form-control"
-                                placeholder="Search tasks, teams, users…"
-                                aria-label="Search"
-                                value={searchTerm}
-                                onChange={handleSearchChange}
-                                onKeyPress={handleKeyPress}
-                            />
-                            <button className="btn btn-outline-secondary" type="button" onClick={handleSearchSubmit}>
-                                <i className="bi bi-search"></i>
-                            </button>
-                        </div>
-                        {/* User Avatar */}
-                        <div className="dropdown">
-                            <a className="d-block link-dark text-decoration-none dropdown-toggle" href="#" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false">
-                                <img src={userAvatar} alt="User Avatar" width="40" height="40" className="rounded-circle" />
-                            </a>
-                            <ul className="dropdown-menu text-small shadow" aria-labelledby="dropdownUser">
-                                <li><Link className="dropdown-item" to="/profile">Settings</Link></li>
-                                <li><Link className="dropdown-item" to="/profile">Profile</Link></li>
-                                <li><hr className="dropdown-divider" /></li>
-                                <li><Link className="dropdown-item" to="/logout">Sign out</Link></li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
+        {/* Settings Sections */}
+        <div className="row gy-4">
+          {/* Account Settings */}
+          <div className="col-12 col-lg-6">
+            <div className="card p-4 shadow-sm h-100">
+              <h5 className="fw-bold mb-3">Account Settings</h5>
+              <div className="mb-3">
+                <i className="bi bi-lock me-2"></i>
+                <strong>Change Password</strong>
+              </div>
+              <div className="mb-3">
+                <i className="bi bi-shield-lock me-2"></i>
+                <strong>Two-Factor Authentication</strong>
+              </div>
+              <div className="text-danger">
+                <i className="bi bi-trash3 me-2"></i>
+                <strong>Delete Account</strong>
+              </div>
             </div>
-        </nav>
-    );
-}
+          </div>
 
-export default Navbar;
+          {/* Privacy + Linked Accounts */}
+          <div className="col-12 col-lg-6">
+            <div className="card p-4 mb-4 shadow-sm h-100">
+              <h5 className="fw-bold mb-3">Privacy Settings</h5>
+              <div className="form-check mb-2">
+                <input className="form-check-input" type="checkbox" id="dataSharing" />
+                <label className="form-check-label" htmlFor="dataSharing">
+                  Allow data sharing with third-party partners
+                </label>
+              </div>
+              <div className="form-check">
+                <input className="form-check-input" type="checkbox" id="adsPersonalization" defaultChecked />
+                <label className="form-check-label" htmlFor="adsPersonalization">
+                  Receive personalized advertisements
+                </label>
+              </div>
+            </div>
+
+            {/* Linked Accounts */}
+            <div className="card p-4 shadow-sm">
+              <h5 className="fw-bold mb-3">Linked Accounts</h5>
+              {Object.entries(linkedAccounts).map(([platform, account], idx) => (
+                <div className="d-flex justify-content-between align-items-center mb-2" key={idx}>
+                  <span className="fw-semibold text-capitalize">{platform}</span>
+                  <span className="text-muted small">{account}</span>
+                  <button className="btn btn-sm btn-outline-danger">Disconnect</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
