@@ -11,7 +11,10 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
+const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
+const { google } = require('googleapis');
+require('dotenv').config();
 
 const app = express();
 const PORT = 5000;
@@ -23,6 +26,8 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '346346971642-sqn2mfp07
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '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';
 // Ensure this redirect URI matches what you configured in Google Cloud Console
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/api/google-auth-callback';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
 
 const oAuth2Client = new OAuth2Client(
     GOOGLE_CLIENT_ID,
@@ -150,6 +155,25 @@ const db = new sqlite3.Database(dbPath, (err) => {
 // --- Middleware ---
 app.use(cors());
 app.use(bodyParser.json());
+
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Get token from "Bearer TOKEN"
+
+    if (token == null) {
+        // Send a JSON error message when no token is provided
+        return res.status(401).json({ message: 'No token provided, authorization denied.' });
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            // Send a JSON error message when the token is invalid or expired
+            return res.status(403).json({ message: 'Token is not valid, authorization denied.' });
+        }
+        req.userId = user.id; // Attach user ID to the request
+        next();
+    });
+}
 
 // --- API Endpoints ---
 
@@ -424,6 +448,44 @@ app.post('/api/forgot-password', (req, res) => {
     });
 });
 
+// Add this new endpoint directly after your existing /api/forgot-password
+app.post('/api/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+        return res.status(400).json({ message: 'Token and new password are required.' });
+    }
+
+    try {
+        const salt = await bcrypt.genSalt(10);
+        const password_hash = await bcrypt.hash(newPassword, salt);
+        db.get('SELECT * FROM users WHERE passwordResetToken = ? AND passwordResetExpires > ?',
+            [token, Date.now()],
+            (err, user) => {
+                if (err) {
+                    console.error('[API Reset Password ERROR] Database error during password reset lookup:', err.message);
+                    return res.status(500).json({ message: 'Server error.' });
+                }
+                if (!user) {
+                    return res.status(400).json({ message: 'Password reset token is invalid or has expired.' });
+                }
+                db.run('UPDATE users SET password_hash = ?, passwordResetToken = NULL, passwordResetExpires = NULL WHERE id = ?',
+                    [password_hash, user.id],
+                    (updateErr) => {
+                        if (updateErr) {
+                            console.error('[API Reset Password ERROR] Database error updating password:', updateErr.message);
+                            return res.status(500).json({ message: 'Server error updating password.' });
+                        }
+                        console.log(`[API Reset Password] Password for user ${user.username} successfully reset.`);
+                        res.status(200).json({ message: 'Your password has been successfully reset.' });
+                    }
+                );
+            });
+    } catch (hashError) {
+        console.error('[API Reset Password ERROR] Error hashing new password:', hashError);
+        res.status(500).json({ message: 'Server error.' });
+    }
+});
+
 /**
  * Example of a protected API route.
  * Requires a valid JWT in the 'Authorization' header (e.g., "Bearer YOUR_TOKEN").
@@ -474,8 +536,8 @@ app.get('/api/board', (req, res) => {
                         GROUP_CONCAT(u.username) AS assignees_names,
                         GROUP_CONCAT(u.id) AS assignees_ids
                     FROM tasks t
-                    LEFT JOIN task_assignees ta ON t.id = ta.task_id
-                    LEFT JOIN users u ON ta.user_id = u.id
+                             LEFT JOIN task_assignees ta ON t.id = ta.task_id
+                             LEFT JOIN users u ON ta.user_id = u.id
                     WHERE t.column_id = ?
                     GROUP BY t.id
                     ORDER BY t.position ASC
@@ -520,8 +582,8 @@ app.get('/api/tasks', (req, res) => {
             GROUP_CONCAT(u.username) AS assignees_names,
             GROUP_CONCAT(u.id) AS assignees_ids
         FROM tasks t
-        LEFT JOIN task_assignees ta ON t.id = ta.task_id
-        LEFT JOIN users u ON ta.user_id = u.id
+                 LEFT JOIN task_assignees ta ON t.id = ta.task_id
+                 LEFT JOIN users u ON ta.user_id = u.id
         GROUP BY t.id
         ORDER BY t.createdAt DESC
     `;
@@ -1079,7 +1141,7 @@ app.delete('/api/users/:id', (req, res) => {
 
 // GET all users (team members)
 app.get('/api/users', (req, res) => {
-    const sql = "SELECT id, username, email, role, createdAt FROM users";
+    const sql = "SELECT id, username, email, role, createdAt, avatar FROM users";
     db.all(sql, [], (err, rows) => {
         if (err) {
             console.error('[API GET /api/users ERROR] Error fetching users:', err.message);
@@ -1088,6 +1150,200 @@ app.get('/api/users', (req, res) => {
         res.status(200).json(rows);
     });
 });
+
+// GET /api/profile - Get the authenticated user's profile
+app.get('/api/profile', authenticateToken, (req, res) => {
+    // --- ADDED DEBUGGING LOGS ---
+    console.log('[API GET /api/profile] Received request for user ID:', req.userId);
+    // ----------------------------
+
+    const sql = "SELECT id, username, email, role, avatar, googleId FROM users WHERE id = ?";
+    db.get(sql, [req.userId], (err, row) => {
+        if (err) {
+            console.error('[API GET /api/profile ERROR]', err.message);
+            return res.status(500).json({ message: 'Error fetching user profile.' });
+        }
+        if (!row) {
+            // --- ADDED DEBUGGING LOGS ---
+            console.warn(`[API GET /api/profile WARNING] User with ID ${req.userId} not found in database.`);
+            // ----------------------------
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        // Add a placeholder for linked accounts to match the frontend UI
+        const profileData = {
+            ...row,
+            linkedAccounts: {
+                google: row.googleId ? row.email : null,
+                slack: null,
+                jira: null,
+            }
+        };
+
+        // --- ADDED DEBUGGING LOGS ---
+        console.log('[API GET /api/profile] Successfully fetched profile data:', profileData);
+        // ----------------------------
+        res.status(200).json(profileData);
+    });
+});
+
+
+// PUT /api/profile - Update the authenticated user's profile
+app.put('/api/profile', authenticateToken, (req, res) => {
+    const { username, email, avatar } = req.body;
+
+    // Check for a token to ensure the user is authenticated
+    if (!req.userId) {
+        return res.status(401).json({ message: 'Unauthorized. Please log in.' });
+    }
+
+    const sql = "UPDATE users SET username = ?, email = ?, avatar = ? WHERE id = ?";
+    db.run(sql, [username, email, avatar, req.userId], function(err) {
+        if (err) {
+            console.error('[API PUT /api/profile ERROR]', err.message);
+            return res.status(500).json({ message: 'Error updating user profile.' });
+        }
+
+        if (this.changes === 0) {
+            return res.status(404).json({ message: 'User not found or no changes made.' });
+        }
+
+        // Fetch the updated profile to send back to the client
+        db.get("SELECT id, username, email, role, avatar FROM users WHERE id = ?", [req.userId], (err, row) => {
+            if (err || !row) {
+                return res.status(500).json({ message: 'Error fetching updated profile.' });
+            }
+            res.status(200).json(row);
+        });
+    });
+});
+
+// Add this new endpoint
+app.put('/api/profile/password', authenticateToken, async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!req.userId) {
+        return res.status(401).json({ message: 'Unauthorized. Please log in.' });
+    }
+    if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: 'Current password and new password are required.' });
+    }
+
+    db.get('SELECT password_hash FROM users WHERE id = ?', [req.userId], async (err, user) => {
+        if (err) {
+            console.error('[API PUT /api/profile/password ERROR] Database error:', err.message);
+            return res.status(500).json({ message: 'Server error.' });
+        }
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Incorrect current password.' });
+        }
+
+        try {
+            const salt = await bcrypt.genSalt(10);
+            const newPassword_hash = await bcrypt.hash(newPassword, salt);
+            db.run('UPDATE users SET password_hash = ? WHERE id = ?', [newPassword_hash, req.userId], function(updateErr) {
+                if (updateErr) {
+                    console.error('[API PUT /api/profile/password ERROR] Failed to update password:', updateErr.message);
+                    return res.status(500).json({ message: 'Error updating password.' });
+                }
+                console.log(`[API PUT /api/profile/password] Password for user ${req.userId} successfully changed.`);
+                res.status(200).json({ message: 'Password changed successfully.' });
+            });
+        } catch (hashError) {
+            console.error('[API PUT /api/profile/password ERROR] Error hashing new password:', hashError);
+            res.status(500).json({ message: 'Server error during password update.' });
+        }
+    });
+});
+
+// --- File Upload Configuration and Route ---
+
+// Ensure the uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+    console.log(`[File Upload Setup] 'uploads' directory does not exist. Creating it...`);
+    try {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+        console.log(`[File Upload Setup] 'uploads' directory created successfully.`);
+    } catch (mkdirErr) {
+        console.error(`[File Upload ERROR] Error creating 'uploads' directory:`, mkdirErr.message);
+    }
+}
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/');
+    },
+    filename: function (req, file, cb) {
+        // Create a unique file name
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB file size limit
+    fileFilter: function (req, file, cb) {
+        // Accept images only
+        if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/i)) {
+            return cb(new Error('Only image files are allowed!'), false);
+        }
+        cb(null, true);
+    }
+}).single('avatar'); // 'avatar' is the name of the form field
+
+/**
+ * Route to handle user avatar uploads.
+ * Requires a valid JWT and a file with the field name 'avatar'.
+ */
+app.post('/api/profile/avatar', authenticateToken, (req, res) => {
+    upload(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+            console.error('[API Avatar Upload ERROR] Multer error:', err.message);
+            return res.status(400).json({ message: err.message });
+        } else if (err) {
+            console.error('[API Avatar Upload ERROR] Unknown upload error:', err.message);
+            return res.status(500).json({ message: err.message });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file was uploaded.' });
+        }
+
+        // Your `authenticateToken` middleware stores the user ID in `req.userId`
+        const userId = req.userId;
+        const newAvatarUrl = `/uploads/${req.file.filename}`;
+
+        const sql = 'UPDATE users SET avatar = ? WHERE id = ?';
+        db.run(sql, [newAvatarUrl, userId], function (dbErr) {
+            if (dbErr) {
+                console.error('Database error during avatar update:', dbErr);
+                // Delete the uploaded file if the database update fails
+                fs.unlink(req.file.path, (unlinkErr) => {
+                    if (unlinkErr) console.error('Failed to delete uploaded file:', unlinkErr);
+                });
+                return res.status(500).json({ message: 'Failed to update avatar in the database.' });
+            }
+
+            // Respond with the new avatar URL
+            res.json({
+                message: 'Avatar updated successfully',
+                avatar: newAvatarUrl,
+            });
+        });
+    });
+});
+
+// Serve static files from the 'uploads' directory
+app.use('/uploads', express.static('uploads'));
+
 
 // --- Server Start ---
 app.listen(PORT, () => {

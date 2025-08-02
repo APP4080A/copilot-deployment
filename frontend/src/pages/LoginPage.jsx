@@ -4,47 +4,44 @@ import React, { useState, useEffect } from "react";
 import "./styles/LoginPage.css";
 import logo from '../assets/logo.png';
 import google from '../assets/google.jpg';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
   const navigate = useNavigate();
+  const location = useLocation(); // Get the current location object
 
-  // Effect to handle redirects from Google OAuth callback
+  // This useEffect hook handles the Google OAuth redirect
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    const params = new URLSearchParams(location.search);
+    const googleToken = params.get('token');
+    const registrationMessage = params.get('message');
     const authError = params.get('error');
-    const successMessage = params.get('message');
 
-    if (token) {
-      // This path is for successful Google LOGIN (existing user)
-      localStorage.setItem('userToken', token);
-      setMessage('Login successful via Google!');
-      console.log('Google Login successful, token stored.');
-      window.history.replaceState({}, document.title, window.location.pathname);
-      navigate('/tasks'); // Redirect to TaskboardPage after Google login
-    } else if (successMessage === 'google_registration_success') {
-      // Handle Google REGISTRATION success: Display message on login page
-      setMessage('Google account registered successfully! Please log in.');
-      window.history.replaceState({}, document.title, window.location.pathname);
-
+    if (googleToken) {
+      // If a token is in the URL, it means the Google login was successful
+      localStorage.setItem('userToken', googleToken);
+      console.log('Google login successful, token stored:', googleToken);
+      navigate('/tasks'); // Redirect to tasks page
+    } else if (registrationMessage === 'google_registration_success') {
+      // Handle successful registration, maybe show a message
+      setError('Registration with Google was successful! Please try logging in again.');
+      // Clear the message from the URL
+      navigate(location.pathname, { replace: true });
     } else if (authError) {
-      // This path is for any Google OAuth errors
-      setError(`Google login failed: ${authError.replace(/_/g, ' ')}`);
-      console.error('Google login error:', authError);
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // Handle errors from the Google callback
+      setError('Google authentication failed. Please try again.');
+      // Clear the error from the URL
+      navigate(location.pathname, { replace: true });
     }
-  }, [navigate]);
+  }, [location, navigate]); // Rerun this effect when location changes
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
-    setMessage('');
 
     if (!username || !password) {
       setError('Please enter both username and password.');
@@ -63,10 +60,9 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setMessage(data.message);
         localStorage.setItem('userToken', data.token);
         console.log('Login successful, token stored:', data.token);
-        navigate('/tasks'); // Redirect to TaskboardPage after successful login
+        navigate('/tasks');
       } else {
         setError(data.message || 'Login failed. Please try again.');
         console.error('Login failed:', data.message);
@@ -95,7 +91,7 @@ export default function LoginPage() {
   return (
       <div className="login-container">
         <div className="login-box">
-          <img src={logo} alt="Co-pilot Logo" className="login-icon" />
+          {/* Your logo and header content */}
           <h2>Log In</h2>
           <p>Start streamlining your projects and collaboration.</p>
           <form onSubmit={handleLogin}>
@@ -123,7 +119,6 @@ export default function LoginPage() {
             </div>
 
             {error && <p className="error-message" style={{ color: 'red', marginTop: '10px' }}>{error}</p>}
-            {message && <p className="success-message" style={{ color: 'green', marginTop: '10px' }}>{message}</p>}
 
             <button type="submit" className="login-button">Login</button>
             <div className="login-footer">
@@ -135,7 +130,7 @@ export default function LoginPage() {
             <hr /> <span>OR</span> <hr />
           </div>
           <button className="google-login" onClick={handleGoogleLogin}>
-            <img src={google} alt="Google Icon" className="google-icon" />
+            {/* Your Google icon */}
             Continue with Google
           </button>
         </div>

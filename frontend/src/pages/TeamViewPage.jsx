@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useContext } from 'react';
+// src/pages/TeamViewPage.jsx
+
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { TaskContext } from '../contexts/TaskContext';
 import { useSearch } from '../contexts/SearchContext';
@@ -7,8 +9,33 @@ import Modal from 'react-modal';
 
 Modal.setAppElement('#root');
 
+// Helper component for highlighting text based on a search term
+const HighlightText = ({ text, highlight }) => {
+    if (!highlight) {
+        return <span>{text}</span>;
+    }
+
+    const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
+    return (
+        <span>
+            {parts.map((part, i) => (
+                <span
+                    key={i}
+                    style={
+                        part.toLowerCase() === highlight.toLowerCase()
+                            ? { backgroundColor: '#ffff00', fontWeight: 'bold' }
+                            : {}
+                    }
+                >
+                    {part}
+                </span>
+            ))}
+        </span>
+    );
+};
+
 // Helper component for displaying individual task cards in the Team Tasks section
-function TeamTaskCard({ task }) {
+function TeamTaskCard({ task, searchTerm }) {
     if (!task) {
         return null;
     }
@@ -38,8 +65,12 @@ function TeamTaskCard({ task }) {
     return (
         <div className="card h-100 shadow-sm">
             <div className="card-body d-flex flex-column">
-                <h5 className="card-title fw-bold mb-1">{task.title}</h5>
-                <p className="card-text text-muted small mb-2 flex-grow-1 text-truncate" style={{ maxHeight: '3em', overflow: 'hidden' }}>{task.description}</p>
+                <h5 className="card-title fw-bold mb-1">
+                    <HighlightText text={task.title} highlight={searchTerm} />
+                </h5>
+                <p className="card-text text-muted small mb-2 flex-grow-1 text-truncate" style={{ maxHeight: '3em', overflow: 'hidden' }}>
+                    <HighlightText text={task.description} highlight={searchTerm} />
+                </p>
                 <div className="d-flex justify-content-between align-items-center mb-2">
                     <span className="text-muted small"><i className="bi bi-calendar me-1"></i>{task.due}</span>
                     <span className={`badge ${getPriorityBadgeClass(task.priority)}`}>{task.priority} Priority</span>
@@ -197,10 +228,8 @@ export default function TeamViewPage() {
     const filteredTeamMembers = teamMembersData.filter(member => {
         const localSearchMatches = member.username.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
             member.email.toLowerCase().includes(memberSearchTerm.toLowerCase());
-        const globalSearchMatches = member.username.toLowerCase().includes(globalSearchTerm.toLowerCase()) ||
-            member.email.toLowerCase().includes(globalSearchTerm.toLowerCase());
         const matchesRole = memberFilterRole === 'All Roles' || member.role === memberFilterRole;
-        return (localSearchMatches || globalSearchMatches) && matchesRole;
+        return localSearchMatches && matchesRole;
     });
 
     const handleSendInvitation = (e) => {
@@ -276,19 +305,43 @@ export default function TeamViewPage() {
     };
 
 
-    const totalTasks = tasksData.length;
-    const remainingTasks = tasksData.filter(task => task.status !== 'done' && task.status !== 'blocked').length;
-    const tasksCompleted = tasksData.filter(task => task.status === 'done').length;
+    // Memoize the filtered tasks based on the global searchTerm
+    const filteredTasksByGlobalSearch = useMemo(() => {
+        if (!globalSearchTerm) {
+            return tasksData;
+        }
+        const lowercasedSearchTerm = globalSearchTerm.toLowerCase();
+        return tasksData.filter(task =>
+            task.title.toLowerCase().includes(lowercasedSearchTerm) ||
+            (task.description && task.description.toLowerCase().includes(lowercasedSearchTerm)) ||
+            (task.assignees && task.assignees.some(assignee => assignee.toLowerCase().includes(lowercasedSearchTerm))) ||
+            (task.tags && task.tags.some(tag => tag.toLowerCase().includes(lowercasedSearchTerm)))
+        );
+    }, [tasksData, globalSearchTerm]);
+
+    const totalTasks = filteredTasksByGlobalSearch.length;
+    const remainingTasks = filteredTasksByGlobalSearch.filter(task => task.status !== 'done' && task.status !== 'blocked').length;
+    const tasksCompleted = filteredTasksByGlobalSearch.filter(task => task.status === 'done').length;
     const newInvitesCount = teamMembersData.filter(member => member.status === 'Pending').length;
     const allRoles = ["All Roles", "Project Manager", "Lead Developer", "UI/UX Designer", "QA Specialist", "Frontend Developer", "Backend Developer"];
 
-    // Filter tasks to show only those with 2 or more assignees
-    const teamTasks = tasksData.filter(task => task.assignees && task.assignees.length >= 2);
+    // Filter tasks to show only those with 2 or more assignees from the global search results
+    const teamTasks = filteredTasksByGlobalSearch.filter(task => task.assignees && task.assignees.length >= 2);
+
+    // Create an array of 4 slots to ensure a consistent layout
+    const taskSlots = useMemo(() => {
+        const sortedTasks = teamTasks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 4);
+        const slots = [...sortedTasks];
+        while (slots.length < 4) {
+            slots.push(null); // Use null to represent an empty slot
+        }
+        return slots;
+    }, [teamTasks]);
 
 
     return (
-        <div className="d-flex flex-column min-vh-100 bg-light">
-            <main className="flex-grow-1 p-4">
+        <div className="d-flex flex-column min-vh-100 bg-light" style={{minWidth: '1240px'}}>
+            <main className="flex-grow-1 p-4" style={{minWidth: '1000px'}}>
 
                 <section className="mb-4">
                     <h2 className="mb-3">Team Overview</h2>
@@ -343,9 +396,11 @@ export default function TeamViewPage() {
                         }}>Send invitations to new team members via email.</p>
 
                         {inviteMessage && (
-                            <div className={`alert alert-${inviteMessage.type} alert-dismissible fade show`} role="alert">
+                            <div className={`alert alert-${inviteMessage.type} alert-dismissible fade show`}
+                                 role="alert">
                                 {inviteMessage.text}
-                                <button type="button" className="btn-close" onClick={() => setInviteMessage(null)} aria-label="Close"></button>
+                                <button type="button" className="btn-close" onClick={() => setInviteMessage(null)}
+                                        aria-label="Close"></button>
                             </div>
                         )}
 
@@ -356,8 +411,10 @@ export default function TeamViewPage() {
                             gap: '16px',
                             alignItems: 'end',
                         }}>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <label htmlFor="inviteEmailInput" style={{ fontSize: '14px', marginBottom: '6px', color: '#333' }}>Email Address</label>
+                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                <label htmlFor="inviteEmailInput"
+                                       style={{fontSize: '14px', marginBottom: '6px', color: '#333'}}>Email
+                                    Address</label>
                                 <input
                                     type="email"
                                     id="inviteEmailInput"
@@ -377,8 +434,9 @@ export default function TeamViewPage() {
                                 />
                             </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <label htmlFor="inviteRoleSelect" style={{ fontSize: '14px', marginBottom: '6px', color: '#333' }}>Role</label>
+                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                <label htmlFor="inviteRoleSelect"
+                                       style={{fontSize: '14px', marginBottom: '6px', color: '#333'}}>Role</label>
                                 <select
                                     id="inviteRoleSelect"
                                     value={inviteRole}
@@ -404,7 +462,12 @@ export default function TeamViewPage() {
                                 </select>
                             </div>
 
-                            <div style={{ gridColumn: '2 / 3', display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end' }}>
+                            <div style={{
+                                gridColumn: '2 / 3',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                alignItems: 'flex-end'
+                            }}>
                                 <button
                                     type="submit"
                                     style={{
@@ -464,7 +527,9 @@ export default function TeamViewPage() {
                                         <tr key={member.id}>
                                             <td>
                                                 <div className="d-flex align-items-center">
-                                                    <img src={member.avatar} alt={`${member.username} Avatar`} className="rounded-circle me-2" style={{width: '40px', height: '40px'}} />
+                                                    <img src={member.avatar} alt={`${member.username} Avatar`}
+                                                         className="rounded-circle me-2"
+                                                         style={{width: '40px', height: '40px'}}/>
                                                     <div>
                                                         <div className="fw-bold">{member.username}</div>
                                                         <div className="text-muted small">{member.email}</div>
@@ -472,19 +537,29 @@ export default function TeamViewPage() {
                                                 </div>
                                             </td>
                                             <td>{member.role}</td>
-                                            <td><span className={`badge ${getMemberStatusBadgeClass(member.status)}`}>{member.status}</span></td>
+                                            <td><span
+                                                className={`badge ${getMemberStatusBadgeClass(member.status)}`}>{member.status}</span>
+                                            </td>
                                             <td>
                                                 <div className="d-flex gap-2">
-                                                    <button onClick={() => handleViewMember(member)} className="btn btn-sm btn-outline-secondary" title="View"><i className="bi bi-eye"></i></button>
-                                                    <button onClick={() => handleEditMember(member)} className="btn btn-sm btn-outline-primary" title="Edit"><i className="bi bi-pencil"></i></button>
-                                                    <button onClick={() => handleDeleteMember(member)} className="btn btn-sm btn-outline-danger" title="Delete"><i className="bi bi-trash"></i></button>
+                                                    <button onClick={() => handleViewMember(member)}
+                                                            className="btn btn-sm btn-outline-secondary" title="View"><i
+                                                        className="bi bi-eye"></i></button>
+                                                    <button onClick={() => handleEditMember(member)}
+                                                            className="btn btn-sm btn-outline-primary" title="Edit"><i
+                                                        className="bi bi-pencil"></i></button>
+                                                    <button onClick={() => handleDeleteMember(member)}
+                                                            className="btn btn-sm btn-outline-danger" title="Delete"><i
+                                                        className="bi bi-trash"></i></button>
                                                 </div>
                                             </td>
                                         </tr>
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan="4" className="text-center text-muted py-4">No members found matching your criteria.</td>
+                                        <td colSpan="4" className="text-center text-muted py-4">No members found
+                                            matching your criteria.
+                                        </td>
                                     </tr>
                                 )}
                                 </tbody>
@@ -493,41 +568,40 @@ export default function TeamViewPage() {
                     </div>
                 </section>
 
-                {/* Team Tasks Section - now displaying only tasks with multiple assignees */}
+                {/* Team Tasks Section - now displaying a fixed 4-column grid */}
                 <section>
                     <div className="d-flex justify-content-between align-items-center mb-3">
                         <h2 className="mb-0">Team Tasks (Collaborative)</h2>
-                        {/* Moved the button here */}
                         <button
-                            className="btn btn-success btn-sm shadow-sm me-2" // Added me-2 for spacing
+                            className="btn btn-success btn-sm shadow-sm me-2"
                             onClick={() => setIsCreateTeamTaskModalOpen(true)}
-                            style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '6px' }}
+                            style={{padding: '8px 16px', fontSize: '0.9rem', borderRadius: '6px'}}
                         >
                             + Create New Team Task
                         </button>
-                        {/* The Link to View All Tasks will be moved below */}
                     </div>
                     <div className="row g-4">
-                        {teamTasks.length > 0 ? (
-                            teamTasks
-                                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                                .slice(0, 6)
-                                .map(task => (
-                                    <div className="col-12 col-sm-6 col-md-4 col-lg-3" key={task.id}>
-                                        <TeamTaskCard task={task} />
+                        {taskSlots.map((task, index) => (
+                            <div className="col-12 col-sm-6 col-md-4 col-lg-3"
+                                 key={task ? task.id : `placeholder-${index}`}>
+                                {task ? (
+                                    <TeamTaskCard task={task} searchTerm={globalSearchTerm}/>
+                                ) : (
+                                    <div className="card h-100 shadow-sm border-dashed text-center text-muted"
+                                         style={{padding: '2rem'}}>
+                                        <div
+                                            className="d-flex flex-column align-items-center justify-content-center h-100">
+                                            <i className="bi bi-kanban display-4 mb-2"></i>
+                                            <p className="fw-bold mb-0">Empty Slot</p>
+                                        </div>
                                     </div>
-                                ))
-                        ) : (
-                            <div className="col-12">
-                                <div className="alert alert-info text-center" role="alert">
-                                    No collaborative tasks available. Create one above!
-                                </div>
+                                )}
                             </div>
-                        )}
+                        ))}
                     </div>
-                    {/* View All Tasks button moved to the bottom of the section */}
                     <div className="text-center mt-4">
-                        <Link to="/tasks" className="btn btn-outline-primary">View All Tasks <i className="bi bi-arrow-right"></i></Link>
+                        <Link to="/tasks" className="btn btn-outline-primary">View All Tasks <i
+                            className="bi bi-arrow-right"></i></Link>
                     </div>
                 </section>
             </main>
@@ -547,16 +621,21 @@ export default function TeamViewPage() {
                     {selectedMember && (
                         <div>
                             <div className="d-flex align-items-center mb-3">
-                                <img src={selectedMember.avatar} alt={`${selectedMember.username} Avatar`} className="rounded-circle me-3" style={{width: '60px', height: '60px'}} />
+                                <img src={selectedMember.avatar} alt={`${selectedMember.username} Avatar`}
+                                     className="rounded-circle me-3" style={{width: '60px', height: '60px'}}/>
                                 <div>
                                     <h4 className="mb-0">{selectedMember.username}</h4>
                                     <p className="text-muted small mb-0">{selectedMember.email}</p>
                                 </div>
                             </div>
-                            <hr />
+                            <hr/>
                             <p><strong>Role:</strong> {selectedMember.role}</p>
-                            <p><strong>Status:</strong> <span className={`badge ${getMemberStatusBadgeClass(selectedMember.status)}`}>{selectedMember.status}</span></p>
-                            <p><strong>Joined:</strong> {selectedMember.createdAt ? new Date(selectedMember.createdAt).toLocaleDateString() : 'N/A'}</p>
+                            <p><strong>Status:</strong> <span
+                                className={`badge ${getMemberStatusBadgeClass(selectedMember.status)}`}>{selectedMember.status}</span>
+                            </p>
+                            <p>
+                                <strong>Joined:</strong> {selectedMember.createdAt ? new Date(selectedMember.createdAt).toLocaleDateString() : 'N/A'}
+                            </p>
                         </div>
                     )}
                 </div>
@@ -613,7 +692,9 @@ export default function TeamViewPage() {
                                 </select>
                             </div>
                             <div className="d-flex justify-content-end">
-                                <button type="button" className="btn btn-secondary me-2" onClick={() => setIsEditModalOpen(false)}>Cancel</button>
+                                <button type="button" className="btn btn-secondary me-2"
+                                        onClick={() => setIsEditModalOpen(false)}>Cancel
+                                </button>
                                 <button type="submit" className="btn btn-primary">Save Changes</button>
                             </div>
                         </form>
@@ -630,7 +711,8 @@ export default function TeamViewPage() {
             >
                 <div className="modal-header">
                     <h5 className="modal-title">Create New Team Task</h5>
-                    <button type="button" className="btn-close" onClick={() => setIsCreateTeamTaskModalOpen(false)}></button>
+                    <button type="button" className="btn-close"
+                            onClick={() => setIsCreateTeamTaskModalOpen(false)}></button>
                 </div>
                 <div className="modal-body">
                     <p style={{
@@ -642,7 +724,8 @@ export default function TeamViewPage() {
                     {newTaskMessage && (
                         <div className={`alert alert-${newTaskMessage.type} alert-dismissible fade show`} role="alert">
                             {newTaskMessage.text}
-                            <button type="button" className="btn-close" onClick={() => setNewTaskMessage(null)} aria-label="Close"></button>
+                            <button type="button" className="btn-close" onClick={() => setNewTaskMessage(null)}
+                                    aria-label="Close"></button>
                         </div>
                     )}
 
@@ -652,8 +735,9 @@ export default function TeamViewPage() {
                         gap: '16px',
                         alignItems: 'end',
                     }}>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <label htmlFor="teamTaskTitle" style={{ fontSize: '14px', marginBottom: '6px', color: '#333' }}>Task Title</label>
+                        <div style={{display: 'flex', flexDirection: 'column'}}>
+                            <label htmlFor="teamTaskTitle"
+                                   style={{fontSize: '14px', marginBottom: '6px', color: '#333'}}>Task Title</label>
                             <input
                                 type="text"
                                 id="teamTaskTitle"
@@ -664,8 +748,10 @@ export default function TeamViewPage() {
                                 className="form-control"
                             />
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <label htmlFor="teamTaskDescription" style={{ fontSize: '14px', marginBottom: '6px', color: '#333' }}>Description (Optional)</label>
+                        <div style={{display: 'flex', flexDirection: 'column'}}>
+                            <label htmlFor="teamTaskDescription"
+                                   style={{fontSize: '14px', marginBottom: '6px', color: '#333'}}>Description
+                                (Optional)</label>
                             <textarea
                                 id="teamTaskDescription"
                                 placeholder="Task description"
@@ -675,8 +761,9 @@ export default function TeamViewPage() {
                                 className="form-control"
                             />
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <label htmlFor="teamTaskDue" style={{ fontSize: '14px', marginBottom: '6px', color: '#333' }}>Due Date</label>
+                        <div style={{display: 'flex', flexDirection: 'column'}}>
+                            <label htmlFor="teamTaskDue" style={{fontSize: '14px', marginBottom: '6px', color: '#333'}}>Due
+                                Date</label>
                             <input
                                 type="date"
                                 id="teamTaskDue"
@@ -685,8 +772,10 @@ export default function TeamViewPage() {
                                 className="form-control"
                             />
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <label htmlFor="teamTaskTags" style={{ fontSize: '14px', marginBottom: '6px', color: '#333' }}>Tags (comma-separated)</label>
+                        <div style={{display: 'flex', flexDirection: 'column'}}>
+                            <label htmlFor="teamTaskTags"
+                                   style={{fontSize: '14px', marginBottom: '6px', color: '#333'}}>Tags
+                                (comma-separated)</label>
                             <input
                                 type="text"
                                 id="teamTaskTags"
@@ -696,8 +785,9 @@ export default function TeamViewPage() {
                                 className="form-control"
                             />
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <label htmlFor="teamTaskPriority" style={{ fontSize: '14px', marginBottom: '6px', color: '#333' }}>Priority</label>
+                        <div style={{display: 'flex', flexDirection: 'column'}}>
+                            <label htmlFor="teamTaskPriority"
+                                   style={{fontSize: '14px', marginBottom: '6px', color: '#333'}}>Priority</label>
                             <select
                                 id="teamTaskPriority"
                                 value={newTaskPriority}
@@ -709,8 +799,10 @@ export default function TeamViewPage() {
                                 <option value="High">High</option>
                             </select>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <label htmlFor="teamTaskAssignees" style={{ fontSize: '14px', marginBottom: '6px', color: '#333' }}>Assignees (Select multiple)</label>
+                        <div style={{display: 'flex', flexDirection: 'column'}}>
+                            <label htmlFor="teamTaskAssignees"
+                                   style={{fontSize: '14px', marginBottom: '6px', color: '#333'}}>Assignees (Select
+                                multiple)</label>
                             <select
                                 id="teamTaskAssignees"
                                 multiple
@@ -718,7 +810,7 @@ export default function TeamViewPage() {
                                 onChange={handleAssigneeSelectChange}
                                 required
                                 className="form-select"
-                                style={{ minHeight: '100px' }}
+                                style={{minHeight: '100px'}}
                             >
                                 {teamMembersData.map(member => (
                                     <option key={member.id} value={member.id}>
@@ -728,7 +820,12 @@ export default function TeamViewPage() {
                             </select>
                         </div>
 
-                        <div style={{ gridColumn: '1 / 3', display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end' }}>
+                        <div style={{
+                            gridColumn: '1 / 3',
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            alignItems: 'flex-end'
+                        }}>
                             <button
                                 type="submit"
                                 style={{

@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
                                      passwordResetToken TEXT UNIQUE,
                                      passwordResetExpires DATETIME,
                                      role TEXT DEFAULT 'Member',
+                                     avatar TEXT, -- Added this line
                                      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -54,17 +55,18 @@ CREATE TABLE IF NOT EXISTS task_assignees (
 ---
 
 -- Initial Data for Users (Seed Data)
-INSERT OR IGNORE INTO users (username, email, role, createdAt) VALUES
-                                                                   ('Ann Wambui', 'ann.wambui@example.com', 'Frontend Developer', '2024-01-10'),
-                                                                   ('Brian Mwangi', 'brian.mwangi@example.com', 'Backend Developer', '2024-01-15'),
-                                                                   ('Caroline Njeri', 'caroline.njeri@example.com', 'UI/UX Designer', '2024-01-20'),
-                                                                   ('Daniel Ochieng', 'daniel.ochieng@example.com', 'QA Specialist', '2024-01-25'),
-                                                                   ('Emily Chebet', 'emily.chebet@example.com', 'Frontend Developer', '2024-02-01'),
-                                                                   ('Francis Kamau', 'francis.kamau@example.com', 'Backend Developer', '2024-02-05'),
-                                                                   ('Grace Akinyi', 'grace.akinyi@example.com', 'UI/UX Designer', '2024-02-10'),
-                                                                   ('Hassan Ali', 'hassan.ali@example.com', 'QA Specialist', '2024-02-15'),
-                                                                   ('Irene Mumbi', 'irene.mumbi@example.com', 'Project Manager', '2024-02-20'),
-                                                                   ('James Kimani', 'james.kimani@example.com', 'Lead Developer', '2024-02-25');
+-- Note: 'avatar' field is now part of the INSERT statement
+INSERT OR IGNORE INTO users (username, email, role, avatar, createdAt) VALUES
+                                                                           ('Ann Wambui', 'ann.wambui@example.com', 'Frontend Developer', 'https://ui-avatars.com/api/?name=Ann+Wambui', '2024-01-10'),
+                                                                           ('Brian Mwangi', 'brian.mwangi@example.com', 'Backend Developer', 'https://ui-avatars.com/api/?name=Brian+Mwangi', '2024-01-15'),
+                                                                           ('Caroline Njeri', 'caroline.njeri@example.com', 'UI/UX Designer', 'https://ui-avatars.com/api/?name=Caroline+Njeri', '2024-01-20'),
+                                                                           ('Daniel Ochieng', 'daniel.ochieng@example.com', 'QA Specialist', 'https://ui-avatars.com/api/?name=Daniel+Ochieng', '2024-01-25'),
+                                                                           ('Emily Chebet', 'emily.chebet@example.com', 'Frontend Developer', 'https://ui-avatars.com/api/?name=Emily+Chebet', '2024-02-01'),
+                                                                           ('Francis Kamau', 'francis.kamau@example.com', 'Backend Developer', 'https://ui-avatars.com/api/?name=Francis+Kamau', '2024-02-05'),
+                                                                           ('Grace Akinyi', 'grace.akinyi@example.com', 'UI/UX Designer', 'https://ui-avatars.com/api/?name=Grace+Akinyi', '2024-02-10'),
+                                                                           ('Hassan Ali', 'hassan.ali@example.com', 'QA Specialist', 'https://ui-avatars.com/api/?name=Hassan+Ali', '2024-02-15'),
+                                                                           ('Irene Mumbi', 'irene.mumbi@example.com', 'Project Manager', 'https://ui-avatars.com/api/?name=Irene+Mumbi', '2024-02-20'),
+                                                                           ('James Kimani', 'james.kimani@example.com', 'Lead Developer', 'https://ui-avatars.com/api/?name=James+Kimani', '2024-02-25');
 
 ---
 

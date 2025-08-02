@@ -1,548 +1,103 @@
-/* src/pages/styles/TaskboardPage.css */
-*, *::before, *::after {
-    box-sizing: border-box;
-}
+/* frontend/src/pages/styles/TaskboardTest.css */
 
-/* --- Variables (for easier theming) --- */
-:root {
-    --primary-blue: #3b82f6;
-    --primary-blue-dark: #2563eb;
-    --light-gray-bg: #f5f7fa;
-    --column-bg: #ebecf0;
-    --card-bg: #ffffff;
-    --border-color: #e0e6ed;
-    --text-dark: #1f2937;
-    --text-medium: #4b5563;
-    --text-light: #6b7280;
-    --shadow-light: 0 1px 3px rgba(0,0,0,0.08);
-    --shadow-medium: 0 4px 10px rgba(0,0,0,0.12);
-    --border-radius-base: 8px;
-    --column-spacing: 20px;
-    --card-spacing: 12px;
-    --navbar-height: 60px;
-    --header-height-approx: 80px;
-}
-
-body {
-    margin: 0;
-    font-family: 'Inter', sans-serif;
-    background-color: var(--light-gray-bg);
-    color: var(--text-dark);
-}
-
-/* --- Taskboard Page Layout --- */
-.taskboard-page-layout {
+/* Custom styling for the inner card of each column */
+.column-inner-card {
+    /* Ensure the card itself is a flex container and stacks its children vertically */
     display: flex;
     flex-direction: column;
-    min-height: calc(100vh - var(--navbar-height));
-    padding: var(--column-spacing);
-    padding-top: calc(var(--column-spacing) + var(--navbar-height));
-    background-color: var(--light-gray-bg);
+    /* The h-100 class from Bootstrap in JSX already sets height to 100% of parent,
+       but reinforcing flex context here is key. */
 }
 
-/* --- Header Section --- */
-.taskboard-header-section {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--column-spacing);
-    padding-bottom: 15px;
-    border-bottom: 1px solid var(--border-color);
-
+/* Custom min-height for task cards to ensure consistency */
+.task-card-custom-min-height {
+    min-height: 120px; /* Adjust as needed */
+    position: relative; /* For positioning edit button */
 }
 
-.taskboard-main-title {
-    font-size: 2.2rem;
-    font-weight: 700;
-    color: var(--primary-blue-dark);
-    margin: 0 0 10px 0;
-    flex-grow: 1;
+/* Custom styling for the task tag badges */
+.custom-tag-style {
+    font-size: 0.75rem; /* Smaller font size for tags */
+    padding-top: 0.2rem !important; /* Adjust padding for better look */
+    padding-bottom: 0.2rem !important;
 }
 
-.add-column-form {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    margin-top: 10px;
-}
-
-.add-column-input {
-    padding: 10px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-base);
-    font-size: 1rem;
-    outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    flex: 1;
-    min-width: 150px;
-}
-
-.add-column-input:focus {
-    border-color: var(--primary-blue);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-}
-
-.add-column-btn {
-    padding: 10px 15px;
-    background-color: var(--primary-blue);
-    color: white;
-    border: none;
-    border-radius: var(--border-radius-base);
-    font-size: 1rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.1s ease;
-    white-space: nowrap;
-}
-
-.add-column-btn:hover {
-    background-color: var(--primary-blue-dark);
-    transform: translateY(-1px);
-}
-
-/* --- Columns Container --- */
-.columns-grid-container {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--column-spacing);
-    padding-bottom: 15px;
-    align-items: flex-start;
-
-    grid-auto-rows: minmax(min-content, max-content);
-    /* For a very large number of columns causing performance issues, consider `grid-auto-flow: dense;` */
-}
-
-/* --- Individual Column --- */
-.task-column {
-    min-width: 250px;
-    background-color: var(--column-bg);
-    border-radius: var(--border-radius-base);
-    padding: var(--card-spacing);
-    box-shadow: var(--shadow-light);
-    display: flex;
-    flex-direction: column;
-    min-height: 200px;
-    /* Ensure column itself can grow vertically but also allow internal scrolling */
-    max-height: calc(100vh - var(--navbar-height) - var(--header-height-approx) - (var(--column-spacing) * 2)); /* Approx. calculation for vertical scrolling within column */
-    overflow-y: auto; /* Allow vertical scrolling inside columns if tasks exceed max-height */
-}
-
-
-.task-column::-webkit-scrollbar {
-    width: 8px; /* For vertical scrollbar */
-}
-
-.task-column::-webkit-scrollbar-thumb {
-    background-color: #ccc;
-    border-radius: 10px;
-}
-
-.task-column::-webkit-scrollbar-thumb:hover {
-    background-color: #999;
-}
-
-
-.column-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--card-spacing);
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(0,0,0,0.05); /* Subtle separator */
-    flex-shrink: 0; /* Prevent header from shrinking when tasks overflow */
-}
-
-.column-title {
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: var(--text-dark);
-    margin: 0;
-}
-
-.column-task-count {
-    font-size: 0.9rem;
-    color: var(--text-light);
-    font-weight: normal;
-}
-
-.column-delete-btn {
-    background: none;
-    border: none;
-    color: var(--text-light);
-    font-size: 1.2rem;
-    cursor: pointer;
-    opacity: 0.7;
-    transition: opacity 0.2s ease, color 0.2s ease;
-    line-height: 1; /* Prevents button from affecting height of header */
-}
-
-.column-delete-btn:hover {
-    opacity: 1;
-    color: #ef4444; /* Red for delete */
-}
-
-/* --- Task List within Column --- */
-.task-list-container {
-    flex-grow: 1; /* Allows task list to fill remaining space */
-    min-height: 50px; /* For visual drop target in empty columns */
-    padding-bottom: var(--card-spacing); /* Padding at bottom for drag/drop */
-    /* If .task-column has overflow-y: auto, this container itself doesn't need it */
-    /* overflow-y: auto; // REMOVE if task-column handles it */
-}
-
-/* --- Task Card --- */
-.task-card {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-base);
-    padding: 12px 15px;
-    margin-bottom: var(--card-spacing);
-    box-shadow: var(--shadow-light);
-    cursor: grab;
-    transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
-    list-style: none; /* Remove default list styling if applied from parent */
-    position: relative; /* For edit button positioning */
-}
-
-.task-card:last-child {
-    margin-bottom: 0; /* No margin below the last card */
-}
-
-.task-card:hover {
-    background-color: #f7f9fc;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.task-card h4.task-title {
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0 0 8px 0;
-    color: var(--text-dark);
-}
-
-.task-card p.task-due {
-    font-size: 0.85rem;
-    color: var(--text-medium);
-    margin: 0 0 10px 0;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.task-tags {
-    margin-bottom: 10px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-.task-tag {
-    background-color: #e0f2fe;
-    color: #0c4a6e;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.task-assignee {
-    font-size: 0.85rem;
-    color: var(--text-medium);
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin-top: 8px; /* Space from tags */
-}
-
-.task-edit-btn {
+/* Custom position for the edit button on task cards */
+.task-edit-btn-custom {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    background: none;
-    border: none;
-    color: var(--primary-blue);
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
+    top: 5px; /* Adjust as needed */
+    right: 5px; /* Adjust as needed */
+    padding: 0.1rem 0.4rem; /* Smaller padding */
+    font-size: 0.75rem; /* Smaller font size */
     opacity: 0; /* Hidden by default */
-    transition: opacity 0.2s ease, color 0.2s ease;
-    padding: 4px 8px; /* Make clickable area larger */
+    transition: opacity 0.2s ease-in-out;
+}
+
+.task-card-custom-min-height:hover .task-edit-btn-custom {
+    opacity: 1; /* Show on hover */
+}
+
+
+/* Make task list container scrollable vertically within column */
+.task-list-container-custom {
+    /* This element is already flex-grow-1 and overflow-auto in JSX. */
+    overflow-y: auto; /* Ensure vertical scrolling is enabled */
+
+    /* NEW: Set a max-height to limit visible tasks and force scrolling */
+    /* Approximately 2 tasks (120px min-height + 8px margin-bottom = 128px per task) */
+    /* (128px * 2 tasks) - 8px (last task doesn't have bottom margin) = 248px.
+       Using 250px for a bit of buffer. Adjust this value if your task cards change size. */
+    max-height: 250px;
+
+    /* Add a custom scrollbar if desired (for WebKit browsers) */
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: #888 #f1f1f1; /* Firefox */
+}
+
+.task-list-container-custom::-webkit-scrollbar {
+    width: 8px;
+}
+
+.task-list-container-custom::-webkit-scrollbar-track {
+    background: #f1f1f1;
     border-radius: 4px;
 }
 
-.task-card:hover .task-edit-btn {
-    opacity: 1;
+.task-list-container-custom::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
 }
 
-.task-edit-btn:hover {
-    color: var(--primary-blue-dark);
-    background-color: rgba(59, 130, 246, 0.1);
-}
-
-
-/* --- Add Task Form/Button --- */
-.add-task-btn {
-    width: 100%;
-    padding: 10px;
-    background-color: #eef2f8;
-    color: var(--primary-blue);
-    border: 1px dashed var(--border-color);
-    border-radius: var(--border-radius-base);
-    font-size: 0.95rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease;
-    margin-top: auto;
-    flex-shrink: 0;
-}
-
-.add-task-btn:hover {
-    background-color: #e0e7f2;
-    border-color: var(--primary-blue);
-}
-
-.add-task-form {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: var(--card-spacing);
-}
-
-.add-task-input {
-    padding: 10px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-base);
-    font-size: 0.95rem;
-    outline: none;
-}
-
-.add-task-input:focus {
-    border-color: var(--primary-blue);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-}
-
-.add-task-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 5px;
-}
-
-.add-task-submit-btn,
-.add-task-cancel-btn {
-    padding: 8px 12px;
-    border: none;
-    border-radius: var(--border-radius-base);
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    flex: 1; /* Make buttons share space evenly */
-}
-
-.add-task-submit-btn {
-    background-color: var(--primary-blue);
-    color: white;
-}
-
-.add-task-submit-btn:hover {
-    background-color: var(--primary-blue-dark);
-}
-
-.add-task-cancel-btn {
-    background-color: var(--border-color);
-    color: var(--text-dark);
-}
-
-.add-task-cancel-btn:hover {
-    background-color: var(--text-light);
-    color: white;
+.task-list-container-custom::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 
-/* --- Drag Overlay Styling (for the item being dragged) --- */
-.task-card[data-dnd-overlay="true"] {
-    opacity: 0.9; /* Slightly transparent */
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25); /* Stronger shadow */
+/* Custom scroll bar for the main columns grid (horizontal) */
+/* This applies to the .row element in TaskboardPage.jsx if it overflows horizontally */
+.custom-scroll-bar::-webkit-scrollbar {
+    height: 8px; /* Height of horizontal scrollbar */
+}
+
+.custom-scroll-bar::-webkit-scrollbar-track {
+    background: #e0e0e0;
+    border-radius: 4px;
+}
+
+.custom-scroll-bar::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.custom-scroll-bar::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Styles for DragOverlay */
+.DragOverlay {
+    /* If you need specific styles for the dragged item, add them here */
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
     cursor: grabbing;
-}
-
-
-/* --- Modal Styles --- */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black backdrop */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000; /* Ensure it's on top of everything */
-}
-
-.modal-content {
-    background-color: white;
-    padding: 30px;
-    border-radius: var(--border-radius-base);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-    width: 90%;
-    max-width: 500px; /* Max width for readability */
-    animation: fadeInScale 0.2s ease-out; /* Simple entry animation */
-}
-
-.modal-content h2 {
-    font-size: 1.8rem;
-    color: var(--primary-blue-dark);
-    margin-top: 0;
-    margin-bottom: 25px;
-    text-align: center;
-}
-
-.modal-form-group {
-    margin-bottom: 15px;
-}
-
-.modal-form-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-medium);
-}
-
-.modal-form-group input {
-    width: calc(100% - 20px); /* Account for padding */
-    padding: 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    font-size: 1rem;
-    outline: none;
-    transition: border-color 0.2s ease;
-}
-
-.modal-form-group input:focus {
-    border-color: var(--primary-blue);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-}
-
-.modal-actions {
-    display: flex;
-    justify-content: flex-end; /* Align buttons to the right */
-    gap: 10px;
-    margin-top: 30px;
-}
-
-.modal-save-btn,
-.modal-cancel-btn {
-    padding: 10px 20px;
-    border: none;
-    border-radius: var(--border-radius-base);
-    font-size: 1rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.1s ease;
-}
-
-.modal-save-btn {
-    background-color: var(--primary-blue);
-    color: white;
-}
-
-.modal-save-btn:hover {
-    background-color: var(--primary-blue-dark);
-    transform: translateY(-1px);
-}
-
-.modal-cancel-btn {
-    background-color: var(--border-color);
-    color: var(--text-dark);
-}
-
-.modal-cancel-btn:hover {
-    background-color: var(--text-light);
-    color: white;
-    transform: translateY(-1px);
-}
-
-/* Animations */
-@keyframes fadeInScale {
-    from {
-        opacity: 0;
-        transform: scale(0.9);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-
-/* --- Responsive Adjustments --- */
-@media (max-width: 768px) {
-    .taskboard-header-section {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .taskboard-main-title {
-        font-size: 1.8rem;
-        margin-bottom: 15px;
-    }
-
-    .add-column-form {
-        width: 100%;
-        margin-top: 0;
-        flex-direction: column; /* Stack input and button */
-        align-items: stretch;
-    }
-
-    .add-column-input {
-        width: auto; /* Take full width */
-        min-width: unset;
-    }
-
-    .add-column-btn {
-        width: 100%; /* Full width button */
-    }
-
-    .columns-grid-container {
-        /* On very small screens, make it 1 column */
-        grid-template-columns: 1fr;
-        /* REMOVED: flex-direction: column; and align-items: center; -> no longer a flex container here */
-    }
-
-    .task-column {
-        width: 90%; /* On mobile, give columns more width (relative to its parent, which is now 100%) */
-        max-width: 400px; /* Max width for readability on larger mobile devices */
-    }
-
-    .modal-content {
-        padding: 20px;
-    }
-}
-
-@media (min-width: 769px) and (max-width: 1024px) {
-    .taskboard-page-layout {
-        padding: 20px;
-    }
-    .columns-grid-container {
-        grid-template-columns: repeat(3, 1fr); /* On tablets, maybe 3 columns */
-    }
-    .task-column {
-        min-width: unset; /* Let grid control width fully within these media queries */
-    }
-}
-
-@media (min-width: 1025px) and (max-width: 1440px) {
-    .columns-grid-container {
-        grid-template-columns: repeat(4, 1fr); /* Back to 4 columns on larger screens */
-    }
-}
-
-.task-card-content {
-    width: 100%;
-    padding-bottom: 5px;
-    box-sizing: border-box;
-    cursor: grab;
+    z-index: 999;
+    opacity: 0.9;
 }

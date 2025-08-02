@@ -1,14 +1,15 @@
 // frontend/src/components/Navbar.jsx
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useUser } from '../contexts/UserContext';
 
 import userAvatar from '../assets/useravatar.jpg';
 import { useSearch } from '../contexts/SearchContext';
 
 function Navbar() {
     const location = useLocation();
-
+    const navigate = useNavigate();
+    const { user, loading } = useUser();
 
     // Use the global search context
     const { searchTerm, setSearchTerm } = useSearch();
@@ -23,11 +24,18 @@ function Navbar() {
         console.log("Global search term updated to:", searchTerm);
     };
 
-    // Handle Enter key press in the search input
+    // Function to handle Enter key press in the search input
     const handleKeyPress = (e) => {
         if (e.key === 'Enter') {
             handleSearchSubmit();
         }
+    };
+
+    const handleLogout = () => {
+        // Remove the user's token from local storage
+        localStorage.removeItem('userToken');
+        // Redirect the user to the login page
+        navigate('/login');
     };
 
     return (
@@ -102,13 +110,17 @@ function Navbar() {
                         {/* User Avatar */}
                         <div className="dropdown">
                             <a className="d-block link-dark text-decoration-none dropdown-toggle" href="#" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false">
-                                <img src={userAvatar} alt="User Avatar" width="40" height="40" className="rounded-circle" />
+                                {loading ? (
+                                    <div className="rounded-circle bg-secondary" style={{ width: '40px', height: '40px' }}></div>
+                                ) : (
+                                    <img src={user?.avatar || userAvatar} alt="User Avatar" width="40" height="40" className="rounded-circle" />
+                                )}
                             </a>
                             <ul className="dropdown-menu text-small shadow" aria-labelledby="dropdownUser">
-                                <li><Link className="dropdown-item" to="/profile">Settings</Link></li>
+                                <li><Link className="dropdown-item" to="/profile#account-settings">Settings</Link></li>
                                 <li><Link className="dropdown-item" to="/profile">Profile</Link></li>
                                 <li><hr className="dropdown-divider" /></li>
-                                <li><Link className="dropdown-item" to="/logout">Sign out</Link></li>
+                                <li><button className="dropdown-item" onClick={handleLogout}>Sign out</button></li>
                             </ul>
                         </div>
                     </div>

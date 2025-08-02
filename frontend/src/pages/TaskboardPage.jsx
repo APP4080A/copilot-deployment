@@ -1,7 +1,6 @@
-// frontend/src/pages/TaskboardPage.jsx
-
+// src/pages/TaskboardPage.jsx
 import React, { useState, useContext, useMemo } from 'react';
-import './styles/TaskboardTest.css';
+import './styles/TaskboardPage.css';
 import { DndContext, closestCenter, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities'; // Correct import for CSS utility
@@ -74,7 +73,7 @@ function TaskCard({ task, id, isOverlay = false, onEditClick }) {
 }
 
 // Column Component
-function Column({ id, title, tasks, onAddTask, onDeleteColumn, onEditTaskClick }) {
+function Column({ id, title, tasks, onAddTask, onDeleteColumn, onEditTaskClick, isSearchActive }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: id });
 
     const style = {
@@ -184,7 +183,9 @@ function Column({ id, title, tasks, onAddTask, onDeleteColumn, onEditTaskClick }
                         </div>
                     </div>
                 ) : (
-                    <button className="btn btn-outline-primary w-100 mt-3" onClick={() => setShowInput(true)}>+ Add New Task</button>
+                    !isSearchActive && (
+                        <button className="btn btn-outline-primary w-100 mt-3" onClick={() => setShowInput(true)}>+ Add New Task</button>
+                    )
                 )}
             </div>
         </div>
@@ -380,24 +381,27 @@ export default function TaskboardPage() {
         <div className="d-flex flex-column min-vh-100 bg-light">
             <header className="p-4 bg-white shadow-sm d-flex flex-column flex-md-row justify-content-between align-items-md-center sticky-top">
                 <h1 className="h3 mb-2 mb-md-0 text-dark">Task Board <span role="img" aria-label="card-index">🗂️</span></h1>
-                <div className="input-group w-auto">
-                    <input
-                        type="text"
-                        placeholder="New column title"
-                        value={newColumnName}
-                        onChange={e => setNewColumnName(e.target.value)}
-                        className="form-control"
-                    />
-                    <button onClick={() => {
-                        if (newColumnName.trim()) {
-                            const normalizedName = newColumnName.trim().toLowerCase().replace(/\s+/g, '-');
-                            addColumn(normalizedName);
-                            setNewColumnName('');
-                        }
-                    }} className="btn btn-outline-primary">
-                        + Add Column
-                    </button>
-                </div>
+                {/* Conditionally hide "Add Column" section when a search is active */}
+                { !searchTerm && (
+                    <div className="input-group w-auto">
+                        <input
+                            type="text"
+                            placeholder="New column title"
+                            value={newColumnName}
+                            onChange={e => setNewColumnName(e.target.value)}
+                            className="form-control"
+                        />
+                        <button onClick={() => {
+                            if (newColumnName.trim()) {
+                                const normalizedName = newColumnName.trim().toLowerCase().replace(/\s+/g, '-');
+                                addColumn(normalizedName);
+                                setNewColumnName('');
+                            }
+                        }} className="btn btn-outline-primary">
+                            + Add Column
+                        </button>
+                    </div>
+                )}
             </header>
 
             <main className="container-fluid flex-grow-1 p-4">
@@ -417,6 +421,7 @@ export default function TaskboardPage() {
                                     onAddTask={addTask}
                                     onEditTaskClick={handleEditTaskClick}
                                     onDeleteColumn={columnOrder.length > 1 ? deleteColumn : null}
+                                    isSearchActive={!!searchTerm} // Pass a boolean indicating if a search is active
                                 />
                             ))}
                         </div>

@@ -5,10 +5,10 @@ import Navbar from './Navbar'; // Import your Navbar component
 
 function AppLayout() {
     return (
-        <div className="app-layout">
-            <Navbar /> {/* The Navbar will always be rendered here */}
+        <div className="app-layout" style={{minWidth: '1200px'}}>
+            <Navbar/> {/* The Navbar will always be rendered here */}
             <main className="app-content">
-                <Outlet /> {/* This is where the nested route components will be rendered */}
+                <Outlet/> {/* This is where the nested route components will be rendered */}
             </main>
         </div>
     );
