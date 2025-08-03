@@ -137,7 +137,7 @@ function DashboardPage() {
             <main className="container-fluid p-4">
                 <header className="mb-4">
                     <h1 className="fw-bold text-primary">Dashboard</h1>
-                    <p className="lead text-muted">A quick overview of your team's progress and upcoming tasks.</p>
+                    <p className="text-muted fs-5 mb-4" style={{ fontFamily: 'inherit' }}>A quick overview of your team's progress and upcoming tasks.</p>
                 </header>
 
                 <section className="mb-5">

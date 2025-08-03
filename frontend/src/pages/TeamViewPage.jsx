@@ -360,7 +360,7 @@ export default function TeamViewPage() {
             <main className="flex-grow-1 p-4" style={{minWidth: '1000px'}}>
 
                 <section className="mb-4">
-                    <h2 className="mb-3">Team Overview</h2>
+                    <h2 className="mb-3 text-primary">Team Overview</h2>
                     <div className="row g-4">
                         <div className="col-12 col-sm-6 col-md-3">
                             <div className="card text-center p-3 shadow-sm h-100">

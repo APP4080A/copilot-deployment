@@ -116,9 +116,8 @@ function Navbar() {
                                     <img src={user?.avatar || userAvatar} alt="User Avatar" width="40" height="40" className="rounded-circle" />
                                 )}
                             </a>
-                            <ul className="dropdown-menu text-small shadow" aria-labelledby="dropdownUser">
+                            <ul className="dropdown-menu dropdown-menu-end text-small shadow" aria-labelledby="dropdownUser">
                                 <li><Link className="dropdown-item" to="/profile#account-settings">Settings</Link></li>
-                                <li><Link className="dropdown-item" to="/profile">Profile</Link></li>
                                 <li><hr className="dropdown-divider" /></li>
                                 <li><button className="dropdown-item" onClick={handleLogout}>Sign out</button></li>
                             </ul>

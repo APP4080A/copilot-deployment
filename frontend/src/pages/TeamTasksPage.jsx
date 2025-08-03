@@ -41,8 +41,8 @@ const TeamTasksPage = () => {
     const sortedTasks = [...teamTasks].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return (
-        <div className="bg-light min-vh-100">
-            <div className="container py-5">
+        <div className="d-flex flex-column min-vh-100 bg-ligh">
+            <div className="container-fluid py-5">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                     <h2 className="mb-0">All Team Tasks</h2>
                     <Link to="/team" className="btn btn-outline-secondary">

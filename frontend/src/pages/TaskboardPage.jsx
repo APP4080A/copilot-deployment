@@ -380,7 +380,7 @@ export default function TaskboardPage() {
     return (
         <div className="d-flex flex-column min-vh-100 bg-light">
             <header className="p-4 bg-white shadow-sm d-flex flex-column flex-md-row justify-content-between align-items-md-center sticky-top">
-                <h1 className="h3 mb-2 mb-md-0 text-dark">Task Board <span role="img" aria-label="card-index">🗂️</span></h1>
+                <h1 className="h3 mb-2 mb-md-0 text-primary">Task Board <span role="img" aria-label="card-index">🗂️</span></h1>
                 {/* Conditionally hide "Add Column" section when a search is active */}
                 { !searchTerm && (
                     <div className="input-group w-auto">
