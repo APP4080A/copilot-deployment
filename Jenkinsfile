@@ -16,7 +16,7 @@ pipeline {
             steps {
                 git branch: 'main',
                     url: 'https://github.com/APP4080A/copilot-core.git',
-                    credentialsId: 'github-password'
+                    credentialsId: 'gitHub-pat'
             }
         }
 
