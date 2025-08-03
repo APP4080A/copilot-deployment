@@ -1261,6 +1261,66 @@ app.put('/api/profile/password', authenticateToken, async (req, res) => {
     });
 });
 
+// Add a new POST route to create a user
+app.post('/api/users', (req, res) => {
+    const { username, email, role } = req.body;
+    // Check for required fields
+    if (!email || !username || !role) {
+        return res.status(400).json({ message: 'Username, email, and role are required.' });
+    }
+
+    const defaultAvatar = `https://ui-avatars.com/api/?name=${username}&size=40&background=random&color=fff`;
+    const sql = `
+        INSERT INTO users (username, email, role, avatar)
+        VALUES (?, ?, ?, ?)
+    `;
+
+    db.run(sql, [username, email, role, defaultAvatar], function(err) {
+        if (err) {
+            console.error('Error creating new user:', err.message);
+            return res.status(500).json({ message: 'Error creating new user.' });
+        }
+
+        // Return the newly created user's data
+        res.status(201).json({
+            message: 'User created successfully',
+            user: {
+                id: this.lastID,
+                username: username,
+                email: email,
+                role: role,
+                avatar: defaultAvatar
+            }
+        });
+    });
+});
+
+// New route to get all team tasks (tasks with multiple assignees)
+app.get('/api/team-tasks', (req, res) => {
+    const sql = `
+        SELECT 
+            t.id, t.title, t.description, t.column_id, t.due_date, t.tags, t.priority, t.createdAt,
+            GROUP_CONCAT(u.username) AS assignees
+        FROM tasks t
+        JOIN task_assignees ta ON t.id = ta.task_id
+        JOIN users u ON ta.user_id = u.id
+        GROUP BY t.id
+        HAVING COUNT(ta.user_id) > 1
+    `;
+
+    db.all(sql, [], (err, rows) => {
+        if (err) {
+            console.error('Error fetching team tasks:', err.message);
+            return res.status(500).json({ message: 'Error fetching team tasks.' });
+        }
+        res.json(rows.map(row => ({
+            ...row,
+            tags: JSON.parse(row.tags),
+            assignees: row.assignees.split(',')
+        })));
+    });
+});
+
 // --- File Upload Configuration and Route ---
 
 // Ensure the uploads directory exists

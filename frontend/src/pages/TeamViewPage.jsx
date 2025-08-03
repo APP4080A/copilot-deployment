@@ -232,31 +232,47 @@ export default function TeamViewPage() {
         return localSearchMatches && matchesRole;
     });
 
-    const handleSendInvitation = (e) => {
+    const handleSendInvitation = async (e) => {
         e.preventDefault();
         if (!inviteEmail || inviteRole === 'Select Role...') {
             setInviteMessage({ type: 'danger', text: 'Please enter an email and select a role.' });
             return;
         }
 
-        const newMember = {
-            id: teamMembersData.length + 1,
+        const newMemberData = {
             username: inviteEmail.split('@')[0],
             email: inviteEmail,
             role: inviteRole,
-            status: 'Pending',
-            avatar: `https://ui-avatars.com/api/?name=${inviteEmail.split('@')[0]}&size=40&background=random&color=fff`,
         };
 
-        setTeamMembersData((prevMembers) => [...prevMembers, newMember]);
-        setInviteMessage({ type: 'success', text: `Invitation sent to ${inviteEmail}!` });
+        try {
+            const response = await fetch('http://localhost:5000/api/users', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(newMemberData),
+            });
 
-        setInviteEmail('');
-        setInviteRole('Select Role...');
+            const result = await response.json();
 
-        setTimeout(() => {
-            setInviteMessage(null);
-        }, 3000);
+            if (response.ok) {
+                // If successful, update local state with the new member from the server response (which includes an ID)
+                const newMember = { ...result.user, status: 'Pending', avatar: `https://ui-avatars.com/api/?name=${result.user.username}&size=40&background=random&color=fff` };
+                setTeamMembersData(prevMembers => [...prevMembers, newMember]);
+                setInviteMessage({ type: 'success', text: `Invitation sent to ${newMember.email}!` });
+            } else {
+                throw new Error(result.message || 'Failed to send invitation.');
+            }
+
+        } catch (error) {
+            console.error('Error sending invitation:', error);
+            setInviteMessage({ type: 'danger', text: error.message });
+        } finally {
+            setInviteEmail('');
+            setInviteRole('Select Role...');
+            setTimeout(() => setInviteMessage(null), 5000);
+        }
     };
 
     // Handle multi-select for assignees
@@ -600,9 +616,7 @@ export default function TeamViewPage() {
                         ))}
                     </div>
                     <div className="text-center mt-4">
-                        <Link to="/tasks" className="btn btn-outline-primary">View All Tasks <i
-                            className="bi bi-arrow-right"></i></Link>
-                    </div>
+                        <Link to="/team-tasks" className="btn btn-outline-primary">All Team Tasks <i className="bi bi-arrow-right"></i></Link>                    </div>
                 </section>
             </main>
 

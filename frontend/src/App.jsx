@@ -3,9 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import LoginPage from './pages/LoginPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import ResetPasswordPage from './pages/ResetPasswordPage'; // <-- Add this import
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import LandingPage from "./pages/LandingPage.jsx";
 import DashboardPage from './pages/DashboardPage.jsx';
+import TeamTasksPage from './pages/TeamTasksPage';
 import TeamViewPage from './pages/TeamViewPage.jsx';
 import TaskboardPage from './pages/TaskboardPage.jsx';
 import UserProfilePage from './pages/UserProfilePage.jsx';
@@ -13,7 +14,7 @@ import UserProfilePage from './pages/UserProfilePage.jsx';
 import AppLayout from './components/AppLayout.jsx';
 import { TaskProvider } from './contexts/TaskContext.jsx';
 import { SearchProvider } from './contexts/SearchContext.jsx';
-import { UserProvider } from './contexts/UserContext.jsx'; // <-- New import
+import { UserProvider } from './contexts/UserContext.jsx';
 
 const ProtectedRoute = ({ children }) => {
     const token = localStorage.getItem('userToken');
@@ -52,10 +53,11 @@ export default function App() {
                     <Route path="/team" element={<TeamViewPage />} />
                     <Route path="/tasks" element={<TaskboardPage />} />
                     <Route path="/profile" element={<UserProfilePage />} />
+                    <Route path="/team-tasks" element={<TeamTasksPage />} />
                 </Route>
 
                 {/* Redirect any unmatched routes. */}
-                <Route path="*" element={<Navigate to="/landing" replace />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </Router>
     );
