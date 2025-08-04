@@ -1,23 +1,64 @@
-name: Sample Copilot CI Pipeline
+name: CI Checks
 
 on:
   push:
-    branches: [main, dev]
+    branches:
+      - main
+      - dev
+      - 'feature/**' # Triggers on pushes to feature branches like feature/my-new-feature
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - dev
 
 jobs:
-  build-and-test:
+  backend_ci_checks:
+    name: Backend CI Checks
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend/ # All commands in this job will run inside the backend directory
+
     steps:
-      - uses: actions/checkout@v3
-      - name: Backend Tests
-        run: |
-          cd backend
-          npm install
-          npm test
-      - name: Frontend Build
-        run: |
-          cd frontend
-          npm install
-          npm run build
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Specify your Node.js version for the backend
+          cache: 'npm'
+          cache-dependency-path: './backend/package-lock.json' # Path to lock file for caching
+
+      - name: Install Backend Dependencies
+        run: npm ci
+
+      - name: Run Backend Tests
+        run: npm test
+
+  frontend_ci_checks:
+    name: Frontend CI Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend/ # All commands in this job will run inside the frontend directory
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json' # Path to lock file for caching
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Run Frontend Tests
+        run: npm test
+
+      - name: Build Frontend Application
+        run: npm run build

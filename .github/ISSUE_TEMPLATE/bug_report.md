@@ -1,4 +1,4 @@
-name: Bug Report 🐛
+name: Bug Report 
 description: Report a reproducible bug or crash
 title: "[BUG] <describe issue concisely>"
 labels: bug

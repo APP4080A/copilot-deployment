@@ -1,4 +1,4 @@
-name: Change Request ⚙️
+name: Change Request
 description: Request modification to an approved implementation
 title: "[CHANGE] <brief summary>"
 labels: change-request
