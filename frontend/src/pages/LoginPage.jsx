@@ -25,7 +25,7 @@ export default function LoginPage() {
       // If a token is in the URL, it means the Google login was successful
       localStorage.setItem('userToken', googleToken);
       console.log('Google login successful, token stored:', googleToken);
-      navigate('/tasks'); // Redirect to tasks page
+      navigate('/dashboard'); // Redirect to tasks page
     } else if (registrationMessage === 'google_registration_success') {
       // Handle successful registration, maybe show a message
       setError('Registration with Google was successful! Please try logging in again.');
@@ -62,7 +62,7 @@ export default function LoginPage() {
       if (response.ok) {
         localStorage.setItem('userToken', data.token);
         console.log('Login successful, token stored:', data.token);
-        navigate('/tasks');
+        navigate('/dashboard');
       } else {
         setError(data.message || 'Login failed. Please try again.');
         console.error('Login failed:', data.message);
