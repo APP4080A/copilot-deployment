@@ -1,4 +1,4 @@
-name: Feature Request ✨
+name: Feature Request
 description: Propose a new enhancement or module
 title: "[FEATURE] <brief idea>"
 labels: enhancement
