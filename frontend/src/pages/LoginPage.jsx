@@ -1,48 +1,47 @@
 // src/pages/LoginPage.jsx
+
 import React, { useState, useEffect } from "react";
+import "./styles/LoginPage.css";
 import logo from '../assets/logo.png';
 import google from '../assets/google.jpg';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
   const navigate = useNavigate();
+  const location = useLocation(); // Get the current location object
 
-  // Effect to handle redirects from Google OAuth callback
+  // This useEffect hook handles the Google OAuth redirect
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    const params = new URLSearchParams(location.search);
+    const googleToken = params.get('token');
+    const registrationMessage = params.get('message');
     const authError = params.get('error');
-    const successMessage = params.get('message');
 
-    if (token) {
-      // This path is for successful Google LOGIN (existing user)
-      localStorage.setItem('userToken', token);
-      setMessage('Login successful via Google!');
-      console.log('Google Login successful, token stored.');
-      window.history.replaceState({}, document.title, window.location.pathname);
-      navigate('/tasks'); // Redirect to TaskboardPage after Google login
-    } else if (successMessage === 'google_registration_success') {
-      // Handle Google REGISTRATION success: Display message on login page
-      setMessage('Google account registered successfully! Please log in.');
-      window.history.replaceState({}, document.title, window.location.pathname);
-
+    if (googleToken) {
+      // If a token is in the URL, it means the Google login was successful
+      localStorage.setItem('userToken', googleToken);
+      console.log('Google login successful, token stored:', googleToken);
+      navigate('/tasks'); // Redirect to tasks page
+    } else if (registrationMessage === 'google_registration_success') {
+      // Handle successful registration, maybe show a message
+      setError('Registration with Google was successful! Please try logging in again.');
+      // Clear the message from the URL
+      navigate(location.pathname, { replace: true });
     } else if (authError) {
-      // This path is for any Google OAuth errors
-      setError(`Google login failed: ${authError.replace(/_/g, ' ')}`);
-      console.error('Google login error:', authError);
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // Handle errors from the Google callback
+      setError('Google authentication failed. Please try again.');
+      // Clear the error from the URL
+      navigate(location.pathname, { replace: true });
     }
-  }, [navigate]);
+  }, [location, navigate]); // Rerun this effect when location changes
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
-    setMessage('');
 
     if (!username || !password) {
       setError('Please enter both username and password.');
@@ -61,10 +60,9 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setMessage(data.message);
         localStorage.setItem('userToken', data.token);
         console.log('Login successful, token stored:', data.token);
-        navigate('/tasks'); // Redirect to TaskboardPage after successful login
+        navigate('/tasks');
       } else {
         setError(data.message || 'Login failed. Please try again.');
         console.error('Login failed:', data.message);
@@ -91,43 +89,49 @@ export default function LoginPage() {
   };
 
   return (
-      <div className="container-fluid bg-light min-vh-100 d-flex justify-content-center align-items-center px-3"
-          style={{ overflow: "hidden", paddingTop: "40px", paddingBottom: "40px"}}>
-          <div className="bg-white p-4 rounded-4 shadow-lg w-100"
-           style={{ maxWidth: "420px", minHeight:"auto" , padding: "20px"}}>
-            <div className="text-center mb-4">
-              <img src={logo} alt="Co-pilot Logo" className="mb-3" style={{ width: "50px" }} />
-              <h4 className="fw-bold">Log In</h4>
-              <p className="text-muted mb-0">Start streamlining your projects and collaboration.</p>
-            </div>
+      <div className="login-container">
+        <div className="login-box">
+          {/* Your logo and header content */}
+          <h2>Log In</h2>
+          <p>Start streamlining your projects and collaboration.</p>
           <form onSubmit={handleLogin}>
-            <div className="mb-3">
-              <input type="text" className="form-control" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
-            </div>
-            <div className="mb-3 position-relative">
-              <input type={showPassword ? "text" : "password"} className="form-control" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-              <span className="position-absolute top-50 end-0 translate-middle-y me-3" role="button" onClick={() => setShowPassword(!showPassword)}>👁</span>
+            <input
+                type="text"
+                placeholder="Username"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+            />
+            <div className="password-wrapper">
+              <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+              />
+              <span
+                  className="toggle-password"
+                  onClick={() => setShowPassword(!showPassword)}
+              >
+              👁
+            </span>
             </div>
 
-            {error && <p className="text-danger text-center">{error}</p>}
-            {message && <p className="text-success text-center">{message}</p>}
+            {error && <p className="error-message" style={{ color: 'red', marginTop: '10px' }}>{error}</p>}
 
-            <button type="submit" className="btn btn-primary w-100 mb-3">Log In</button>
-            <p className="text-center">
-              <Link to="/forgot-password" className="text-primary text-decoration-none">Forgot Password?</Link>
-              <p>Don't have an account? <Link to="/signup" className="text-primary text-decoration-none">Sign Up</Link></p>
-            </p>
+            <button type="submit" className="login-button">Login</button>
+            <div className="login-footer">
+              <Link to="/forgot-password" style={{ color: '#007bff', textDecoration: 'none' }}>Forgot Password?</Link>
+              <p>Don't have an account? <Link to="/signup" style={{ color: '#007bff', textDecoration: 'none' }}>Sign Up</Link></p>
+            </div>
           </form>
-
-          <div className="d-flex align-items-center my-3">
-            <hr className="flex-grow-1" />
-            <span className="px-2 text-muted">OR</span>
-            <hr className="flex-grow-1" />
+          <div className="divider">
+            <hr /> <span>OR</span> <hr />
           </div>
-
-          <button className="btn btn-outline-dark w-100 d-flex align-items-center justify-content-center" onClick={handleGoogleLogin}>
-                  <img src={google} alt="Google Icon" className="me-2" style={{ width: "20px", height: "20px" }} />
-                  Continue with Google
+          <button className="google-login" onClick={handleGoogleLogin}>
+            {/* Your Google icon */}
+            Continue with Google
           </button>
         </div>
       </div>

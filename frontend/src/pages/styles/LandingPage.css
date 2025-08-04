@@ -1,0 +1,19 @@
+/* frontend/src/pages/styles/LandingPage.css */
+
+/* Keep basic resets. Bootstrap also has its own normalize/reset. */
+html, body, h1, h2, h3, p, ul {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f9f9f9;
+    color: #333;
+    width: 100%;
+    margin: 0;
+}
+
+/* !!! IMPORTANT: ALL CUSTOM STYLES BELOW THIS LINE HAVE BEEN REMOVED !!! */

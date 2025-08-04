@@ -1,5 +1,6 @@
+// src/pages/LandingPage.jsx
+
 import React from 'react';
-//import "./styles/LandingPage.css";
 import { Link } from "react-router-dom";
 
 export default function LandingPage() {
@@ -9,7 +10,15 @@ export default function LandingPage() {
             {/* Navbar */}
             <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm px-4">
                 <div className="container-fluid">
-                    <span className="navbar-brand fw-bold">Co-Pilot</span>
+                    <Link to="/dashboard" className="navbar-brand d-flex align-items-center">
+                        <img
+                            src="https://img.icons8.com/arcade/64/c-key.png"
+                            alt="Co-Pilot Logo"
+                            className="me-2"
+                            style={{ width: '32px', height: '32px' }}
+                         />
+                        <span className="fw-bold fs-5 text-dark">Co-Pilot</span>
+                    </Link>
                     <div className="d-flex">
                         <Link to="/signup" className="btn btn-primary me-2">Sign Up</Link>
                         <Link to="/login" className="btn btn-outline-secondary">Login</Link>
@@ -18,8 +27,8 @@ export default function LandingPage() {
             </nav>
 
             {/* Hero Section */}
-            <header className="text-center py-5 text-white" style={{ background: "linear-gradient(to right, #e66465, #9198e5)", overflow: "hidden"}}>                
-            <div className="container-fluid">
+            <header className="text-center py-5 text-white" style={{ background: "linear-gradient(to right, #e66465, #9198e5)", overflow: "hidden"}}>
+                <div className="container-fluid">
                     <h1 className="display-5 fw-bold">Elevate Your Team's Productivity with Co-Pilot</h1>
                     <p className="lead mt-3 mb-4 text-dark">
                         Co-Pilot is the ultimate project management tool designed for modern teams.

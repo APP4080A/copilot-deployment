@@ -1,37 +1,17 @@
 // src/pages/TaskboardPage.jsx
-import React, { useState } from 'react';
+import React, { useState, useContext, useMemo } from 'react';
 import './styles/TaskboardPage.css';
 import { DndContext, closestCenter, DragOverlay } from '@dnd-kit/core';
-import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { v4 as uuidv4 } from 'uuid';
+import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities'; // Correct import for CSS utility
+
+import { TaskContext } from '../contexts/TaskContext';
+import { useSearch } from '../contexts/SearchContext'; // Re-import the search context
+
 
 // Helper function to format column titles
 const formatColumnTitle = (id) =>
     id.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').toUpperCase();
-
-//Mock data in for initial columns
-const initialColumns = {
-    todo: [
-        { id: uuidv4(), title: 'Write marketing copy for landing page', due: '2025-06-17', tags: ['Marketing', 'Copywriting'], assignee: 'Charlie' },
-        { id: uuidv4(), title: 'Prepare team meeting agenda', due: '2025-06-18', tags: ['Meeting', 'Planning'], assignee: 'Alice' },
-    ],
-    inprogress: [
-        { id: uuidv4(), title: 'Design user flow for new feature', due: '2025-07-19', tags: ['Design', 'UI/UX'], assignee: 'Alice' },
-        { id: uuidv4(), title: 'Develop authentication module', due: '2025-06-14', tags: ['Backend', 'Auth'], assignee: 'Bob' },
-    ],
-    review: [
-        { id: uuidv4(), title: 'Review Q2 financial report', due: '2025-06-19', tags: ['Finance', 'Report'], assignee: 'David' },
-    ],
-    blocked: [
-        { id: uuidv4(), title: 'Fix critical bug in task assignment', due: '2025-07-20', tags: ['Bug', 'Urgent'], assignee: 'Bob' },
-    ],
-    done: [
-        { id: uuidv4(), title: 'Onboard new team member, Sarah', due: '2025-07-18', tags: ['HR', 'Onboarding'], assignee: 'Charlie' },
-    ],
-};
-
-const initialOrder = ['todo', 'inprogress', 'review', 'blocked', 'done'];
 
 // TaskCard Component
 function TaskCard({ task, id, isOverlay = false, onEditClick }) {
@@ -43,7 +23,8 @@ function TaskCard({ task, id, isOverlay = false, onEditClick }) {
         ...(isOverlay && {
             boxShadow: '0 8px 16px rgba(0, 0, 0, 0.2)',
             cursor: 'grabbing',
-            zIndex: 999
+            zIndex: 999,
+            opacity: 0.9
         })
     };
 
@@ -52,326 +33,420 @@ function TaskCard({ task, id, isOverlay = false, onEditClick }) {
         onEditClick(task);
     };
 
+    const getPriorityBadgeClass = (priority) => {
+        if (typeof priority !== 'string') return 'bg-secondary';
+        switch (priority.toLowerCase()) {
+            case 'high': return 'bg-danger';
+            case 'medium': return 'bg-warning text-dark';
+            case 'low': return 'bg-info';
+            default: return 'bg-secondary';
+        }
+    };
+
     return (
-  <div
-    ref={setNodeRef}
-    style={style}
-    className="card mb-3 shadow-sm"
-  >
-    <div className="card-body p-3" {...attributes} {...listeners}>
-      <h5 className="card-title mb-2">{task.title}</h5>
-      <p className="card-subtitle text-muted mb-2">
-        📅 {task.due}
-      </p>
-
-      <div className="mb-2">
-        {task.tags.map((tag, idx) => (
-          <span key={idx} className="badge bg-light text-dark me-1">
-            {tag}
-          </span>
-        ))}
-      </div>
-
-      <p className="card-text mb-3">👤 {task.assignee}</p>
-
-      <button
-        className="btn btn-sm btn-outline-primary w-100"
-        onClick={handleEditButtonClick}
-      >
-        Edit
-      </button>
-    </div>
-  </div>
-);
-
+        <div ref={setNodeRef} style={style} className="card mb-2 shadow-sm task-card-custom-min-height">
+            <div className="card-body p-3" {...attributes} {...listeners}>
+                <h5 className="card-title fw-bold mb-1">{task.title}</h5>
+                <p className="card-text text-muted small mb-2">
+                    <i className="bi bi-calendar me-1"></i> {task.due}
+                </p>
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                    <div className="d-flex flex-wrap gap-1">
+                        {task.tags?.map((tag, idx) => (
+                            <span key={idx} className="badge bg-info-subtle text-info fw-normal text-uppercase py-1 px-2 rounded-pill custom-tag-style">{tag}</span>
+                        ))}
+                    </div>
+                    {task.priority && (
+                        <span className={`badge ${getPriorityBadgeClass(task.priority)}`}>{task.priority}</span>
+                    )}
+                </div>
+                <div className="text-muted small">
+                    <i className="bi bi-person me-1"></i>
+                    {task.assignee}
+                </div>
+            </div>
+            <button className="btn btn-sm btn-outline-secondary task-edit-btn-custom" onClick={handleEditButtonClick} title="Edit Task">
+                <i className="bi bi-pencil"></i>
+            </button>
+        </div>
+    );
 }
 
 // Column Component
-function Column({ id, title, tasks, onAddTask, onDeleteColumn, onEditTaskClick }) { // Added onEditTaskClick
+function Column({ id, title, tasks, onAddTask, onDeleteColumn, onEditTaskClick, isSearchActive }) {
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+
     const [showInput, setShowInput] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [newTaskDescription, setNewTaskDescription] = useState('');
     const [newTaskDue, setNewTaskDue] = useState('');
     const [newTaskTags, setNewTaskTags] = useState('');
     const [newTaskAssignee, setNewTaskAssignee] = useState('');
+    const [newTaskPriority, setNewTaskPriority] = useState('Low');
 
     const handleAddNewTask = () => {
         if (newTaskTitle.trim()) {
             onAddTask(id, {
-                id: uuidv4(),
                 title: newTaskTitle.trim(),
-                due: newTaskDue || 'TBD', // Default if not entered
-                tags: newTaskTags.split(',').map(tag => tag.trim()).filter(tag => tag), // Split by comma, trim, filter empty
-                assignee: newTaskAssignee || 'Unassigned' // Default if not entered
+                description: newTaskDescription.trim() || 'No description provided.',
+                due: newTaskDue,
+                tags: newTaskTags.split(',').map(tag => tag.trim()).filter(tag => tag),
+                assignee: newTaskAssignee,
+                priority: newTaskPriority
             });
             setNewTaskTitle('');
+            setNewTaskDescription('');
             setNewTaskDue('');
             setNewTaskTags('');
             setNewTaskAssignee('');
+            setNewTaskPriority('Low');
             setShowInput(false);
         }
     };
 
     return (
-  <div className="col-lg-3 col-md-6 mb-4" style={{ height: "400px", width: '350px', minWidth: '260px', flex: '0 0 auto' }}>
-  <div className="border rounded p-3 bg-light shadow-sm h-100 d-flex flex-column">
-    {/* Header */}
-    <div className="d-flex justify-content-between align-items-center mb-3">
-      <h5 className="mb-0">
-        {title} <span className="text-muted">({tasks.length})</span>
-      </h5>
-      {onDeleteColumn && (
-        <button
-          onClick={() => onDeleteColumn(id)}
-          className="btn btn-sm text-muted border-0"
-          style={{ fontSize: "1.2rem" }}
-          aria-label={`Delete column ${title}`}
-        >
-          &times;
-        </button>
-      )}
-    </div>
-
-    {/* Scrollable Task List */}
-    <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-      <div
-        className="flex-grow-1 mb-3"
-        style={{ overflowY: "auto", minHeight: 0 }}
-      >
-        {tasks.map(task => (
-          <TaskCard key={task.id} id={task.id} task={task} onEditClick={onEditTaskClick} />
-        ))}
-      </div>
-    </SortableContext>
-
-    {/* Add Task Section */}
-    {showInput ? (
-      <div className="mt-auto">
-        {/* Inputs... */}
-      </div>
-    ) : (
-      <button className="btn btn-outline-primary btn-sm mt-auto" onClick={() => setShowInput(true)}>
-        + Add New Task
-      </button>
-    )}
-  </div>
-</div>
-
+        <div ref={setNodeRef} style={{minWidth: '300px'}} className="col-12 col-sm-6 col-md-4 col-lg-3 mb-4">
+            <div className="card border-0 bg-light p-3 h-100 column-inner-card">
+                <div className="d-flex justify-content-between align-items-center mb-3" {...attributes} {...listeners}>
+                    <h4 className="mb-0 text-capitalize">{title} <span className="badge bg-secondary rounded-pill ms-2">{tasks.length}</span></h4>
+                    {onDeleteColumn && (
+                        <button onClick={() => onDeleteColumn(id)} className="btn btn-sm btn-outline-danger" aria-label={`Delete column ${title}`}>
+                            <i className="bi bi-trash"></i>
+                        </button>
+                    )}
+                </div>
+                <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                    <div className="task-list-container-custom flex-grow-1 overflow-auto pe-1">
+                        {tasks.map((task) => (
+                            <TaskCard key={task.id} id={task.id} task={task} onEditClick={onEditTaskClick} />
+                        ))}
+                    </div>
+                </SortableContext>
+                {showInput ? (
+                    <div className="mt-3">
+                        <input
+                            type="text"
+                            value={newTaskTitle}
+                            onChange={e => setNewTaskTitle(e.target.value)}
+                            placeholder="Task title"
+                            className="form-control mb-2"
+                        />
+                        <textarea
+                            value={newTaskDescription}
+                            onChange={e => setNewTaskDescription(e.target.value)}
+                            placeholder="Task description"
+                            className="form-control mb-2"
+                            rows="2"
+                        />
+                        <input
+                            type="date"
+                            value={newTaskDue}
+                            onChange={e => setNewTaskDue(e.target.value)}
+                            className="form-control mb-2"
+                            title="Due Date"
+                        />
+                        <input
+                            type="text"
+                            value={newTaskTags}
+                            onChange={e => setNewTaskTags(e.target.value)}
+                            placeholder="Tags (comma-separated)"
+                            className="form-control mb-2"
+                        />
+                        <input
+                            type="text"
+                            value={newTaskAssignee}
+                            onChange={e => setNewTaskAssignee(e.target.value)}
+                            placeholder="Assignee"
+                            className="form-control mb-2"
+                        />
+                        <select
+                            value={newTaskPriority}
+                            onChange={e => setNewTaskPriority(e.target.value)}
+                            className="form-select mb-2"
+                        >
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                        </select>
+                        <div className="d-grid gap-2">
+                            <button onClick={handleAddNewTask} className="btn btn-primary">
+                                Add Task
+                            </button>
+                            <button onClick={() => setShowInput(false)} className="btn btn-outline-secondary">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    !isSearchActive && (
+                        <button className="btn btn-outline-primary w-100 mt-3" onClick={() => setShowInput(true)}>+ Add New Task</button>
+                    )
+                )}
+            </div>
+        </div>
     );
 }
 
+// EditTaskModal Component
+function EditTaskModal({ task, onSave, onClose }) {
+    const [title, setTitle] = useState(task.title);
+    const [due, setDue] = useState(task.due);
+    const [tags, setTags] = useState(task.tags?.join(', '));
+    const [assignee, setAssignee] = useState(task.assignee);
+    const [description, setDescription] = useState(task.description || '');
+    const [priority, setPriority] = useState(task.priority || 'Low');
+
+    const handleSave = () => {
+        onSave({
+            ...task,
+            title: title.trim(),
+            description: description.trim(),
+            due: due,
+            tags: tags?.split(',').map(tag => tag.trim()).filter(tag => tag),
+            assignee: assignee.trim(),
+            priority: priority
+        });
+        onClose();
+    };
+
+    return (
+        <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div className="modal-dialog modal-dialog-centered">
+                <div className="modal-content">
+                    <div className="modal-header">
+                        <h5 className="modal-title">Edit Task</h5>
+                        <button type="button" className="btn-close" onClick={onClose} aria-label="Close"></button>
+                    </div>
+                    <div className="modal-body">
+                        <div className="mb-3">
+                            <label htmlFor="edit-title" className="form-label">Title</label>
+                            <input id="edit-title" type="text" className="form-control" value={title} onChange={e => setTitle(e.target.value)} />
+                        </div>
+                        <div className="mb-3">
+                            <label htmlFor="edit-description" className="form-label">Description</label>
+                            <textarea id="edit-description" className="form-control" value={description} onChange={e => setDescription(e.target.value)} rows="3"></textarea>
+                        </div>
+                        <div className="mb-3">
+                            <label htmlFor="edit-due" className="form-label">Due Date</label>
+                            <input id="edit-due" type="date" className="form-control" value={due} onChange={e => setDue(e.target.value)} />
+                        </div>
+                        <div className="mb-3">
+                            <label htmlFor="edit-tags" className="form-label">Tags (comma-separated)</label>
+                            <input id="edit-tags" type="text" className="form-control" value={tags} onChange={e => setTags(e.target.value)} />
+                        </div>
+                        <div className="mb-3">
+                            <label htmlFor="edit-assignee" className="form-label">Assignee</label>
+                            <input id="edit-assignee" type="text" className="form-control" value={assignee} onChange={e => setAssignee(e.target.value)} />
+                        </div>
+                        <div className="mb-3">
+                            <label htmlFor="edit-priority" className="form-label">Priority</label>
+                            <select id="edit-priority" className="form-select" value={priority} onChange={e => setPriority(e.target.value)}>
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="modal-footer">
+                        <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                        <button type="button" className="btn btn-primary" onClick={handleSave}>Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 // TaskboardPage Main Component
 export default function TaskboardPage() {
-    const [columns, setColumns] = useState(initialColumns);
-    const [columnOrder, setColumnOrder] = useState(initialOrder);
+    const {
+        tasksData,
+        columnOrder,
+        addTask,
+        updateTaskStatus,
+        updateTask,
+        addColumn,
+        deleteColumn,
+        reorderColumn,
+        fetchTasks // Ensure fetchTasks is destructured here
+    } = useContext(TaskContext);
+
     const [newColumnName, setNewColumnName] = useState('');
-    const [activeId, setActiveId] = useState(null); // State for DND active item
-    const [editingTask, setEditingTask] = useState(null); // State to hold the task being edited
+    const [activeId, setActiveId] = useState(null);
+    const [editingTask, setEditingTask] = useState(null);
 
-    const handleAddTask = (columnId, task) => {
-        setColumns(prev => ({ ...prev, [columnId]: [...prev[columnId], task] }));
-    };
+    // Re-import useSearch and use searchTerm for filtering
+    const { searchTerm } = useSearch();
 
-    const handleDeleteColumn = (id) => {
-        if (window.confirm(`Are you sure you want to delete the "${formatColumnTitle(id)}" column? All tasks within it will be lost.`)) {
-            setColumns(prev => {
-                const newCols = { ...prev };
-                delete newCols[id];
-                return newCols;
-            });
-            setColumnOrder(prev => prev.filter(cid => cid !== id));
+    // Memoize the filtered tasks based on the global searchTerm
+    const filteredTasks = useMemo(() => {
+        if (!searchTerm) {
+            return tasksData; // If no search term, return all tasks
         }
-    };
+        const lowercasedSearchTerm = searchTerm.toLowerCase();
+        return tasksData.filter(task =>
+            task.title.toLowerCase().includes(lowercasedSearchTerm) ||
+            (task.description && task.description.toLowerCase().includes(lowercasedSearchTerm)) ||
+            (task.assignee && task.assignee.toLowerCase().includes(lowercasedSearchTerm)) ||
+            (task.tags && task.tags.some(tag => tag.toLowerCase().includes(lowercasedSearchTerm)))
+        );
+    }, [tasksData, searchTerm]);
 
-    const handleAddColumn = () => {
-        if (newColumnName.trim()) {
-            const normalizedName = newColumnName.trim().toLowerCase().replace(/\s+/g, '-');
-            if (columns[normalizedName]) {
-                alert('A column with this name already exists!');
-                return;
-            }
-            setColumns(prev => ({ ...prev, [normalizedName]: [] }));
-            setColumnOrder(prev => [...prev, normalizedName]);
-            setNewColumnName('');
-        }
-    };
+    // Update columns based on filteredTasks
+    const columns = useMemo(() => {
+        const cols = {};
+        columnOrder.forEach(colId => {
+            cols[colId] = filteredTasks.filter(task => task.status === colId);
+        });
+        return cols;
+    }, [filteredTasks, columnOrder]); // Dependency is now filteredTasks
 
-    // DND Handlers
     const handleDragStart = (event) => {
         setActiveId(event.active.id);
     };
 
     const handleDragEnd = (event) => {
         const { active, over } = event;
-        setActiveId(null); // Clear activeId after drag ends
+        setActiveId(null);
 
-        if (!over || active.id === over.id) return;
+        if (!over) return;
 
-        let sourceColumnId = null;
-        let destColumnId = null;
-        let activeTask = null;
+        const isDraggingColumn = columnOrder.includes(active.id);
 
-        // Find the active task and its source column
-        for (const colId in columns) {
-            const taskFound = columns[colId].find(task => task.id === active.id);
-            if (taskFound) {
-                sourceColumnId = colId;
-                activeTask = taskFound;
-                break;
+        if (isDraggingColumn) {
+            if (columnOrder.includes(over.id) && active.id !== over.id) {
+                reorderColumn(active.id, over.id);
             }
-        }
+        } else {
+            let sourceColumnId = null;
+            let destColumnId = null;
+            let activeTask = null;
 
-        if (!sourceColumnId) return;
-
-        // Determine destination column
-        if (columnOrder.includes(over.id)) { // If 'over' is a column itself
-            destColumnId = over.id;
-        } else { // If 'over' is a task, find its parent column
             for (const colId in columns) {
-                if (columns[colId].some(task => task.id === over.id)) {
-                    destColumnId = colId;
+                const taskFound = columns[colId].find(task => task.id === active.id);
+                if (taskFound) {
+                    sourceColumnId = colId;
+                    activeTask = taskFound;
                     break;
                 }
             }
-        }
 
-        if (!destColumnId) return;
+            if (!sourceColumnId || !activeTask) return;
 
-        // If dragging within the same column
-        if (sourceColumnId === destColumnId) {
-            setColumns(prev => {
-                const tasksInColumn = prev[sourceColumnId];
-                const oldIndex = tasksInColumn.findIndex(task => task.id === active.id);
-                const newIndex = tasksInColumn.findIndex(task => task.id === over.id);
-                // Ensure newIndex is valid for arrayMove (e.g., if dragging to an empty space past last item)
-                const finalNewIndex = newIndex === -1 ? tasksInColumn.length : newIndex;
-                return {
-                    ...prev,
-                    [sourceColumnId]: arrayMove(tasksInColumn, oldIndex, finalNewIndex),
-                };
-            });
-        } else {
-            // If dragging between different columns
-            setColumns(prev => {
-                const newSourceTasks = prev[sourceColumnId].filter(task => task.id !== active.id);
-                const newDestTasks = [...prev[destColumnId]];
-                const overIndex = newDestTasks.findIndex(task => task.id === over.id);
-
-                if (overIndex !== -1) {
-                    newDestTasks.splice(overIndex, 0, activeTask);
-                } else {
-                    newDestTasks.push(activeTask);
+            if (columnOrder.includes(over.id)) {
+                destColumnId = over.id;
+            } else {
+                for (const colId in columns) {
+                    if (columns[colId].some(task => task.id === over.id)) {
+                        destColumnId = colId;
+                        break;
+                    }
                 }
+            }
 
-                return {
-                    ...prev,
-                    [sourceColumnId]: newSourceTasks,
-                    [destColumnId]: newDestTasks,
-                };
-            });
+            if (!destColumnId) return;
+
+            if (sourceColumnId !== destColumnId) {
+                updateTaskStatus(active.id, destColumnId);
+            }
         }
     };
 
-    // Edit Task Handlers
     const handleEditTaskClick = (task) => {
-        setEditingTask(task); // Set the task to be edited
+        setEditingTask(task);
     };
 
     const handleSaveEditedTask = (updatedTask) => {
-        setColumns(prevColumns => {
-            const newColumns = { ...prevColumns };
-            let taskFound = false;
-
-            for (const colId in newColumns) {
-                const updatedTasks = newColumns[colId].map(task => {
-                    if (task.id === updatedTask.id) {
-                        taskFound = true;
-                        return updatedTask; // Replace with updated task
-                    }
-                    return task;
-                });
-                newColumns[colId] = updatedTasks;
-                if (taskFound) break; // Stop iterating once task is found and updated
-            }
-            return newColumns;
-        });
-        setEditingTask(null); // Close the modal
+        updateTask(updatedTask);
+        setEditingTask(null);
     };
 
     const handleCloseEditModal = () => {
-        setEditingTask(null); // Close the modal without saving
+        setEditingTask(null);
     };
 
-    // Helper for DragOverlay
     const getActiveTask = () => {
         if (!activeId) return null;
-        for (const colId in columns) {
-            const task = columns[colId].find(t => t.id === activeId);
-            if (task) return task;
-        }
-        return null;
+        // Search in the original tasksData to find the task.
+        return tasksData.find(t => t.id === activeId);
     };
 
 
-return (
-  <div className="container-fluid py-4">
-    <header className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-      <h1 className="h3 fw-bold text-primary">
-        Task Board <span role="img" aria-label="card-index">🗂️</span>
-      </h1>
-      <div className="d-flex gap-2 mt-3 mt-md-0">
-        <input
-          type="text"
-          className="form-control"
-          placeholder="New column title"
-          value={newColumnName}
-          onChange={e => setNewColumnName(e.target.value)}
-          style={{ maxWidth: '120px' }}
-        />
-        <button className="btn btn-primary" onClick={handleAddColumn}>+ Add Column</button>
-      </div>
-    </header>
+    return (
+        <div className="d-flex flex-column min-vh-100 bg-light">
+            <header className="p-4 bg-white shadow-sm d-flex flex-column flex-md-row justify-content-between align-items-md-center sticky-top">
+                <h1 className="h3 mb-2 mb-md-0 text-primary">Task Board <span role="img" aria-label="card-index">🗂️</span></h1>
+                {/* Conditionally hide "Add Column" section when a search is active */}
+                { !searchTerm && (
+                    <div className="input-group w-auto">
+                        <input
+                            type="text"
+                            placeholder="New column title"
+                            value={newColumnName}
+                            onChange={e => setNewColumnName(e.target.value)}
+                            className="form-control"
+                        />
+                        <button onClick={() => {
+                            if (newColumnName.trim()) {
+                                const normalizedName = newColumnName.trim().toLowerCase().replace(/\s+/g, '-');
+                                addColumn(normalizedName);
+                                setNewColumnName('');
+                            }
+                        }} className="btn btn-outline-primary">
+                            + Add Column
+                        </button>
+                    </div>
+                )}
+            </header>
 
-    <DndContext
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="row gy-4">
-        {columnOrder.map(colId => (
-          <div className="col-md-6 col-lg-3" key={colId}>
-            <Column
-              id={colId}
-              title={formatColumnTitle(colId)}
-              tasks={columns[colId] || []}
-              onAddTask={handleAddTask}
-              onEditTaskClick={handleEditTaskClick}
-              onDeleteColumn={columnOrder.length > 1 ? handleDeleteColumn : null}
-            />
-          </div>
-        ))}
-      </div>
+            <main className="container-fluid flex-grow-1 p-4">
+                <DndContext
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                >
+                    <SortableContext items={columnOrder} strategy={rectSortingStrategy}>
+                        <div className="row g-3 g-lg-4 align-items-stretch h-100">
+                            {columnOrder.map(colId => (
+                                <Column
+                                    key={colId}
+                                    id={colId}
+                                    title={formatColumnTitle(colId)}
+                                    tasks={columns[colId] || []}
+                                    onAddTask={addTask}
+                                    onEditTaskClick={handleEditTaskClick}
+                                    onDeleteColumn={columnOrder.length > 1 ? deleteColumn : null}
+                                    isSearchActive={!!searchTerm} // Pass a boolean indicating if a search is active
+                                />
+                            ))}
+                        </div>
+                    </SortableContext>
 
-      <DragOverlay>
-        {activeId ? (
-          <TaskCard
-            id={activeId}
-            task={getActiveTask()}
-            isOverlay={true}
-            onEditClick={() => {}} // No edit on drag overlay
-          />
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+                    <DragOverlay>
+                        {activeId ? (
+                            <TaskCard
+                                id={activeId}
+                                task={getActiveTask()}
+                                isOverlay={true}
+                                onEditClick={() => {}}
+                            />
+                        ) : null}
+                    </DragOverlay>
+                </DndContext>
+            </main>
 
-    {editingTask && (
-      <EditTaskModal
-        task={editingTask}
-        onSave={handleSaveEditedTask}
-        onClose={handleCloseEditModal}
-      />
-    )}
-  </div>
-);
-
+            {editingTask && (
+                <EditTaskModal
+                    task={editingTask}
+                    onSave={handleSaveEditedTask}
+                    onClose={handleCloseEditModal}
+                />
+            )}
+        </div>
+    );
 }

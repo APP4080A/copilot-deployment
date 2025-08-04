@@ -1,7 +1,7 @@
 ## Overview
 Brief summary of what this PR accomplishes.
 
-##  Testing Checklist
+## Testing Checklist
 - [ ] Code compiles and runs locally
 - [ ] Related tests pass
 - [ ] New logic is covered by tests

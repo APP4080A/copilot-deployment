@@ -1,4 +1,5 @@
 // src/pages/SignupPage.jsx
+
 import React, { useState, useEffect } from "react";
 import logo from '../assets/logo.png';
 import google from '../assets/google.jpg';
