@@ -38,43 +38,43 @@ const oAuth2Client = new OAuth2Client(
 
 
 // --- Nodemailer Transporter Setup for Ethereal Email (for testing) ---
-let transporter; // Declare transporter globally
+if (process.env.NODE_ENV !== 'test') {
+  // --- Nodemailer Transporter Setup for Ethereal Email (for testing) ---
+  let transporter; // Declare transporter globally
 
-// Create a test account with Ethereal.email
-nodemailer.createTestAccount((err, account) => {
-    if (err) {
-        console.error('[Nodemailer ERROR] Failed to create a testing account with Ethereal:', err.message);
-        console.warn('Email sending will not work. Please check your network connection or try again.');
-        // Fallback or exit if Ethereal account cannot be created
-        return;
-    }
+  nodemailer.createTestAccount((err, account) => {
+      if (err) {
+          console.error('[Nodemailer ERROR] Failed to create a testing account with Ethereal:', err.message);
+          console.warn('Email sending will not work. Please check your network connection or try again.');
+          return;
+      }
 
-    transporter = nodemailer.createTransport({
-        host: account.smtp.host,
-        port: account.smtp.port,
-        secure: account.smtp.secure,
-        auth: {
-            user: account.user,
-            pass: account.pass,
-        },
-        tls: {
-            rejectUnauthorized: false // Allow self-signed certs for Ethereal
-        }
-    });
+      transporter = nodemailer.createTransport({
+          host: account.smtp.host,
+          port: account.smtp.port,
+          secure: account.smtp.secure,
+          auth: {
+              user: account.user,
+              pass: account.pass,
+          },
+          tls: {
+              rejectUnauthorized: false
+          }
+      });
 
-    console.log('[Nodemailer] Ethereal test account created.');
-    console.log('[Nodemailer] Ethereal SMTP URL:', nodemailer.getTestMessageUrl(account)); // Log the Ethereal inbox URL
+      console.log('[Nodemailer] Ethereal test account created.');
+      console.log('[Nodemailer] Ethereal SMTP URL:', nodemailer.getTestMessageUrl(account));
 
-    // Verify transporter configuration
-    transporter.verify(function (error, success) {
-        if (error) {
-            console.error('[Nodemailer ERROR] Transporter verification failed:', error);
-            console.warn('Email sending might not work. Please check Ethereal setup.');
-        } else {
-            console.log('[Nodemailer] Server is ready to take our messages via Ethereal.');
-        }
-    });
-});
+      transporter.verify(function (error, success) {
+          if (error) {
+              console.error('[Nodemailer ERROR] Transporter verification failed:', error);
+              console.warn('Email sending might not work. Please check Ethereal setup.');
+          } else {
+              console.log('[Nodemailer] Server is ready to take our messages via Ethereal.');
+          }
+      });
+  });
+}
 // --- End Nodemailer Transporter Setup ---
 
 
