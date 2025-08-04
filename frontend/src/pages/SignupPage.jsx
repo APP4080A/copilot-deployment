@@ -1,6 +1,5 @@
 // src/pages/SignupPage.jsx
 import React, { useState, useEffect } from "react";
-import "./styles/LoginPage.css";
 import logo from '../assets/logo.png';
 import google from '../assets/google.jpg';
 import { Link, useNavigate } from 'react-router-dom';
@@ -93,7 +92,7 @@ export default function SignupPage() {
         console.log('Attempting to navigate to login page...'); // Added console log for debugging
 
         setTimeout(() => {
-          navigate('/');
+          navigate('/login');
           console.log('Navigation to login page initiated.');
         }, 100); // Small delay
       } else {
@@ -127,80 +126,55 @@ export default function SignupPage() {
   };
 
   return (
-      <div className="login-container">
-        <div className="login-box">
-          <img src={logo} alt="Co-pilot Logo" className="login-icon" />
-          <h2>Create Your Co-pilot Account</h2>
-          <p>Start streamlining your projects and collaboration.</p>
-          <form onSubmit={handleSignup}>
-            <input
-                type="text"
-                placeholder="Full Name"
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-            />
-            <input
-                type="email"
-                placeholder="Email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-            />
-            <input
-                type="text"
-                placeholder="Username"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-            />
-            <div className="password-wrapper">
-              <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-              />
-              <span
-                  className="toggle-password"
-                  onClick={() => setShowPassword(!showPassword)}
-              >
-              👁
-            </span>
-            </div>
-            <div className="password-wrapper">
-              <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Confirm Password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-              <span
-                  className="toggle-password"
-                  onClick={() => setShowPassword(!showPassword)}
-              >
-              👁
-            </span>
-            </div>
-
-            {error && <p className="error-message" style={{ color: 'red', marginTop: '10px' }}>{error}</p>}
-            {message && <p className="success-message" style={{ color: 'green', marginTop: '10px' }}>{message}</p>}
-
-            <button type="submit" className="login-button">Sign Up</button>
-            <div className="login-footer">
-              <p>Already have an account? <Link to="/" style={{ color: '#007bff', textDecoration: 'none' }}>Log In</Link></p>
-            </div>
-          </form>
-          <div className="divider">
-            <hr /> <span>OR</span> <hr />
-          </div>
-          <button className="google-login" onClick={handleGoogleLogin}>
-            <img src={google} alt="Google Icon" className="google-icon" />
-            Continue with Google
-          </button>
-        </div>
+  <div className="container-fluid bg-light min-vh-100 d-flex justify-content-center align-items-center px-3"
+    style={{ overflow: "hidden", paddingTop: "40px", paddingBottom: "40px"}}>
+    <div className="bg-white p-4 rounded-4 shadow-lg w-100"
+     style={{ maxWidth: "420px", minHeight:"auto" }}>
+      <div className="text-center mb-4">
+        <img src={logo} alt="Co-pilot Logo" className="mb-3" style={{ width: "50px" }} />
+        <h4 className="fw-bold">Create Your Co-pilot Account</h4>
+        <p className="text-muted mb-0">Start streamlining your projects and collaboration.</p>
       </div>
-  );
+
+      <form onSubmit={handleSignup}>
+        <div className="mb-3">
+          <input type="text" className="form-control" placeholder="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+        </div>
+        <div className="mb-3">
+          <input type="email" className="form-control" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </div>
+        <div className="mb-3">
+          <input type="text" className="form-control" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+        </div>
+        <div className="mb-3 position-relative">
+          <input type={showPassword ? "text" : "password"} className="form-control" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <span className="position-absolute top-50 end-0 translate-middle-y me-3" role="button" onClick={() => setShowPassword(!showPassword)}>👁</span>
+        </div>
+        <div className="mb-3 position-relative">
+          <input type={showPassword ? "text" : "password"} className="form-control" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+          <span className="position-absolute top-50 end-0 translate-middle-y me-3" role="button" onClick={() => setShowPassword(!showPassword)}>👁</span>
+        </div>
+
+        {error && <p className="text-danger text-center">{error}</p>}
+        {message && <p className="text-success text-center">{message}</p>}
+
+        <button type="submit" className="btn btn-primary w-100 mb-3">Sign Up</button>
+        <p className="text-center">
+          Already have an account? <Link to="/login" className="text-primary text-decoration-none">Log In</Link>
+        </p>
+      </form>
+
+      <div className="d-flex align-items-center my-3">
+        <hr className="flex-grow-1" />
+        <span className="px-2 text-muted">OR</span>
+        <hr className="flex-grow-1" />
+      </div>
+
+      <button className="btn btn-outline-dark w-100 d-flex align-items-center justify-content-center" onClick={handleGoogleLogin}>
+        <img src={google} alt="Google Icon" className="me-2" style={{ width: "20px", height: "20px" }} />
+        Continue with Google
+      </button>
+    </div>
+  </div>
+);
 }
