@@ -5,6 +5,9 @@ import logo from '../assets/logo.png';
 import google from '../assets/google.jpg';
 import { Link, useNavigate } from 'react-router-dom';
 
+const API = process.env.REACT_APP_API_URL;
+
+
 export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -75,7 +78,7 @@ export default function SignupPage() {
 
     try {
       // Send a POST request to the backend registration endpoint
-      const response = await fetch('http://localhost:5000/api/register', {
+      const response = await fetch('${API}/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,7 +115,7 @@ export default function SignupPage() {
   const handleGoogleLogin = async () => {
     try {
       // Fetch the Google authorization URL from your backend
-      const response = await fetch('http://localhost:5000/api/google-login');
+      const response = await fetch('${API}/google-login');
       const data = await response.json();
       if (data.authUrl) {
         // Redirect the user's browser to Google's authentication page
