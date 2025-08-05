@@ -78,7 +78,7 @@ export default function SignupPage() {
 
     try {
       // Send a POST request to the backend registration endpoint
-      const response = await fetch('${API}/register', {
+      const response = await fetch(`${API}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
